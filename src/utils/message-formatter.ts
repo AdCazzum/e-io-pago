@@ -6,102 +6,31 @@ import type { ReceiptData } from '../types.js';
 import type OpenAI from 'openai';
 
 /**
- * Generates a natural, friendly message explaining the receipt split
- * Uses GPT-4o to create conversational responses
+ * Generates a simple, concise message with just total and per-person amount
  */
-export async function generateSplitMessage(
+export function generateSplitMessage(
   receiptData: ReceiptData,
   numberOfPeople: number,
   perPersonAmount: number,
-  openai: OpenAI,
-): Promise<string> {
-  // Create itemized list
-  const itemsList = receiptData.items
-    .map(
-      (item) =>
-        `  • ${item.name}${(item.quantity !== null && item.quantity !== undefined && item.quantity > 1) ? ` (x${item.quantity})` : ''}: ${item.price.toFixed(2)} ${receiptData.currency}`,
-    )
-    .join('\n');
+  _openai: OpenAI,
+): string {
+  // Simple, direct message with just the essential info
+  return `💰 **Total: ${receiptData.total.toFixed(2)} ${receiptData.currency}**
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a helpful, friendly assistant that helps groups split bills fairly.
-        Generate a natural, conversational message explaining the receipt and bill split.
-        Be clear, concise, and friendly. Use emojis appropriately to make the message engaging.
-        Keep the tone casual and helpful, like you're helping friends split a bill.
-
-        Structure your response to include:
-        1. A friendly greeting acknowledging the receipt
-        2. Key details (merchant, date if available, total)
-        3. The itemized list provided
-        4. Clear split calculation
-        5. A friendly closing
-
-        Make sure the split amount is very clear and easy to find.`,
-      },
-      {
-        role: 'user',
-        content: `Create a message for a group chat explaining this receipt split:
-        - Merchant: ${receiptData.merchant}
-        ${(receiptData.date !== null && receiptData.date !== undefined && receiptData.date !== '') ? `- Date: ${receiptData.date}` : ''}
-        - Subtotal: ${receiptData.subtotal.toFixed(2)} ${receiptData.currency}
-        - Tax: ${receiptData.tax.toFixed(2)} ${receiptData.currency}
-        ${(receiptData.tip !== null && receiptData.tip !== undefined && receiptData.tip > 0) ? `- Tip: ${receiptData.tip.toFixed(2)} ${receiptData.currency}` : ''}
-        - Total: ${receiptData.total.toFixed(2)} ${receiptData.currency}
-        - Number of people: ${numberOfPeople}
-        - Amount per person: ${perPersonAmount.toFixed(2)} ${receiptData.currency}
-
-        Items:
-${itemsList}`,
-      },
-    ],
-    max_tokens: 500,
-    temperature: 0.7, // Slightly higher for more natural variation
-  });
-
-  const message = response.choices[0].message.content;
-  if (message === null || message === undefined || message === '') {
-    // Fallback to structured message if GPT doesn't respond
-    return createFallbackMessage(receiptData, numberOfPeople, perPersonAmount);
-  }
-
-  return message;
+👥 **Per person: ${perPersonAmount.toFixed(2)} ${receiptData.currency}** (${numberOfPeople} ${numberOfPeople === 1 ? 'person' : 'people'})`;
 }
 
 /**
- * Creates a structured fallback message if GPT-4o fails
+ * Creates a structured fallback message (same simple format)
  */
 export function createFallbackMessage(
   receiptData: ReceiptData,
   numberOfPeople: number,
   perPersonAmount: number,
 ): string {
-  const itemsList = receiptData.items
-    .map(
-      (item) =>
-        `• ${item.name}${(item.quantity !== null && item.quantity !== undefined && item.quantity > 1) ? ` (x${item.quantity})` : ''}: ${item.price.toFixed(2)} ${receiptData.currency}`,
-    )
-    .join('\n');
+  return `💰 **Total: ${receiptData.total.toFixed(2)} ${receiptData.currency}**
 
-  return `📝 **Receipt Analysis Complete!**
-
-🏪 **${receiptData.merchant}**
-${(receiptData.date !== null && receiptData.date !== undefined && receiptData.date !== '') ? `📅 Date: ${receiptData.date}\n` : ''}
-**Items:**
-${itemsList}
-
-💰 Subtotal: ${receiptData.subtotal.toFixed(2)} ${receiptData.currency}
-🧾 Tax: ${receiptData.tax.toFixed(2)} ${receiptData.currency}
-${(receiptData.tip !== null && receiptData.tip !== undefined && receiptData.tip > 0) ? `💵 Tip: ${receiptData.tip.toFixed(2)} ${receiptData.currency}\n` : ''}
-**Total: ${receiptData.total.toFixed(2)} ${receiptData.currency}**
-
-👥 **Split Between ${numberOfPeople} ${numberOfPeople === 1 ? 'Person' : 'People'}:**
-**Each person pays: ${perPersonAmount.toFixed(2)} ${receiptData.currency}** 🎯
-
-Time to settle up! 💸`;
+👥 **Per person: ${perPersonAmount.toFixed(2)} ${receiptData.currency}** (${numberOfPeople} ${numberOfPeople === 1 ? 'person' : 'people'})`;
 }
 
 /**

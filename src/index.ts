@@ -360,7 +360,7 @@ async function main() {
       console.log(`💰 Split calculated: ${receiptData.currency} ${perPerson} per person (${numberOfPeople} people)`);
 
       // Generate and send the split message
-      const splitMessage = await generateSplitMessage(
+      const splitMessage = generateSplitMessage(
         receiptData,
         numberOfPeople,
         perPerson,
