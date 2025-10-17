@@ -2,8 +2,8 @@
  * Receipt analysis using GPT-4o Vision API
  */
 
-import OpenAI from 'openai';
 import type { ReceiptData } from '../types.js';
+import type OpenAI from 'openai';
 
 /**
  * Analyzes a receipt image using GPT-4o Vision API
@@ -15,7 +15,7 @@ import type { ReceiptData } from '../types.js';
 export async function analyzeReceipt(
   base64Image: string,
   mimeType: string,
-  openai: OpenAI
+  openai: OpenAI,
 ): Promise<ReceiptData> {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -63,7 +63,7 @@ export async function analyzeReceipt(
   });
 
   const result = response.choices[0].message.content;
-  if (!result) {
+  if (result === null || result === undefined || result === '') {
     throw new Error('No response from GPT-4o Vision API');
   }
 
@@ -80,22 +80,34 @@ export async function analyzeReceipt(
 /**
  * Validates that the receipt data has the required structure
  */
-export function validateReceiptData(data: any): data is ReceiptData {
+export function validateReceiptData(data: unknown): data is ReceiptData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+
+  const candidate = data as Record<string, unknown>;
+
   return (
-    data &&
-    typeof data.merchant === 'string' &&
-    typeof data.total === 'number' &&
-    data.total > 0 &&
-    typeof data.subtotal === 'number' &&
-    typeof data.tax === 'number' &&
-    typeof data.currency === 'string' &&
-    Array.isArray(data.items) &&
-    data.items.length > 0 &&
-    data.items.every(
-      (item: any) =>
-        typeof item.name === 'string' &&
-        typeof item.price === 'number' &&
-        item.price >= 0
+    typeof candidate.merchant === 'string' &&
+    typeof candidate.total === 'number' &&
+    candidate.total > 0 &&
+    typeof candidate.subtotal === 'number' &&
+    typeof candidate.tax === 'number' &&
+    typeof candidate.currency === 'string' &&
+    Array.isArray(candidate.items) &&
+    candidate.items.length > 0 &&
+    candidate.items.every(
+      (item: unknown) => {
+        if (typeof item !== 'object' || item === null) {
+          return false;
+        }
+        const itemCandidate = item as Record<string, unknown>;
+        return (
+          typeof itemCandidate.name === 'string' &&
+          typeof itemCandidate.price === 'number' &&
+          itemCandidate.price >= 0
+        );
+      },
     )
   );
 }

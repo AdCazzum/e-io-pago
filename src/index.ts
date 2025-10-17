@@ -191,15 +191,22 @@ async function main() {
   // This is the "native" way to mention/tag the agent
   agent.on('reply', async (ctx) => {
     // Skip own messages
-    if (filter.fromSelf(ctx.message, ctx.client)) return;
+    if (filter.fromSelf(ctx.message, ctx.client)) {
+      return;
+    }
 
     const sender = await ctx.getSenderAddress();
+    if (sender === undefined) {
+      console.log('⚠️  Could not get sender address, skipping message');
+      return;
+    }
+
     const replyContent = ctx.message.content;
 
     // Extract the text content from the Reply object
     const messageContent = typeof replyContent === 'string'
       ? replyContent
-      : (replyContent as any).content || '';
+      : (replyContent as Record<string, unknown>).content ?? '';
 
     console.log(`💬 Reply received from ${sender}: "${messageContent}"`);
 

@@ -2,8 +2,8 @@
  * Message formatting utilities for natural language responses
  */
 
-import OpenAI from 'openai';
 import type { ReceiptData } from '../types.js';
+import type OpenAI from 'openai';
 
 /**
  * Generates a natural, friendly message explaining the receipt split
@@ -13,13 +13,13 @@ export async function generateSplitMessage(
   receiptData: ReceiptData,
   numberOfPeople: number,
   perPersonAmount: number,
-  openai: OpenAI
+  openai: OpenAI,
 ): Promise<string> {
   // Create itemized list
   const itemsList = receiptData.items
     .map(
       (item) =>
-        `  • ${item.name}${item.quantity && item.quantity > 1 ? ` (x${item.quantity})` : ''}: ${item.price.toFixed(2)} ${receiptData.currency}`
+        `  • ${item.name}${(item.quantity !== null && item.quantity !== undefined && item.quantity > 1) ? ` (x${item.quantity})` : ''}: ${item.price.toFixed(2)} ${receiptData.currency}`,
     )
     .join('\n');
 
@@ -46,10 +46,10 @@ export async function generateSplitMessage(
         role: 'user',
         content: `Create a message for a group chat explaining this receipt split:
         - Merchant: ${receiptData.merchant}
-        ${receiptData.date ? `- Date: ${receiptData.date}` : ''}
+        ${(receiptData.date !== null && receiptData.date !== undefined && receiptData.date !== '') ? `- Date: ${receiptData.date}` : ''}
         - Subtotal: ${receiptData.subtotal.toFixed(2)} ${receiptData.currency}
         - Tax: ${receiptData.tax.toFixed(2)} ${receiptData.currency}
-        ${receiptData.tip ? `- Tip: ${receiptData.tip.toFixed(2)} ${receiptData.currency}` : ''}
+        ${(receiptData.tip !== null && receiptData.tip !== undefined && receiptData.tip > 0) ? `- Tip: ${receiptData.tip.toFixed(2)} ${receiptData.currency}` : ''}
         - Total: ${receiptData.total.toFixed(2)} ${receiptData.currency}
         - Number of people: ${numberOfPeople}
         - Amount per person: ${perPersonAmount.toFixed(2)} ${receiptData.currency}
@@ -63,7 +63,7 @@ ${itemsList}`,
   });
 
   const message = response.choices[0].message.content;
-  if (!message) {
+  if (message === null || message === undefined || message === '') {
     // Fallback to structured message if GPT doesn't respond
     return createFallbackMessage(receiptData, numberOfPeople, perPersonAmount);
   }
@@ -77,25 +77,25 @@ ${itemsList}`,
 export function createFallbackMessage(
   receiptData: ReceiptData,
   numberOfPeople: number,
-  perPersonAmount: number
+  perPersonAmount: number,
 ): string {
   const itemsList = receiptData.items
     .map(
       (item) =>
-        `• ${item.name}${item.quantity && item.quantity > 1 ? ` (x${item.quantity})` : ''}: ${item.price.toFixed(2)} ${receiptData.currency}`
+        `• ${item.name}${(item.quantity !== null && item.quantity !== undefined && item.quantity > 1) ? ` (x${item.quantity})` : ''}: ${item.price.toFixed(2)} ${receiptData.currency}`,
     )
     .join('\n');
 
   return `📝 **Receipt Analysis Complete!**
 
 🏪 **${receiptData.merchant}**
-${receiptData.date ? `📅 Date: ${receiptData.date}\n` : ''}
+${(receiptData.date !== null && receiptData.date !== undefined && receiptData.date !== '') ? `📅 Date: ${receiptData.date}\n` : ''}
 **Items:**
 ${itemsList}
 
 💰 Subtotal: ${receiptData.subtotal.toFixed(2)} ${receiptData.currency}
 🧾 Tax: ${receiptData.tax.toFixed(2)} ${receiptData.currency}
-${receiptData.tip ? `💵 Tip: ${receiptData.tip.toFixed(2)} ${receiptData.currency}\n` : ''}
+${(receiptData.tip !== null && receiptData.tip !== undefined && receiptData.tip > 0) ? `💵 Tip: ${receiptData.tip.toFixed(2)} ${receiptData.currency}\n` : ''}
 **Total: ${receiptData.total.toFixed(2)} ${receiptData.currency}**
 
 👥 **Split Between ${numberOfPeople} ${numberOfPeople === 1 ? 'Person' : 'People'}:**
@@ -164,6 +164,6 @@ I couldn't extract all the necessary information from this receipt. Please ensur
 Try sending another photo with the complete receipt visible! 📄`;
 
     default:
-      return `Sorry, something went wrong. Please try again! 🔄`;
+      return 'Sorry, something went wrong. Please try again! 🔄';
   }
 }
