@@ -8,7 +8,6 @@ import 'dotenv/config';
 import { Agent, filter } from '@xmtp/agent-sdk';
 import { getTestUrl } from '@xmtp/agent-sdk/debug';
 import { RemoteAttachmentCodec, AttachmentCodec } from '@xmtp/content-type-remote-attachment';
-import type { Attachment } from '@xmtp/content-type-remote-attachment';
 import OpenAI from 'openai';
 
 import { analyzeReceipt, calculateSplit } from './utils/receipt-analyzer.js';
@@ -17,6 +16,12 @@ import {
   createHelpMessage,
   createErrorMessage,
 } from './utils/message-formatter.js';
+import {
+  loadRemoteAttachment,
+  isImage,
+  isSupportedImageFormat,
+  attachmentToBase64,
+} from './utils/attachment-handler.js';
 
 // Rate limiting map to prevent spam
 const rateLimitMap = new Map<string, number>();
@@ -287,26 +292,47 @@ async function main() {
     try {
       console.log('📥 Downloading and decrypting attachment...');
 
-      // Load the remote attachment - use agent.client instead of ctx.client
-      // The attachment event handler receives RemoteAttachment content
-      const attachment = await RemoteAttachmentCodec.load<Attachment>(
-        ctx.message.content,
+      // Debug: Log the attachment metadata to understand what we're receiving
+      const remoteAttachment = ctx.message.content;
+      console.log('🔍 Debug - Remote Attachment Metadata:');
+      console.log(`  - URL: ${remoteAttachment.url}`);
+      console.log(`  - Scheme: ${remoteAttachment.scheme}`);
+      console.log(`  - Filename: ${remoteAttachment.filename}`);
+      console.log(`  - Content Length: ${remoteAttachment.contentLength}`);
+      console.log(`  - Has digest: ${remoteAttachment.contentDigest ? 'Yes' : 'No'}`);
+      console.log(`  - Has salt: ${remoteAttachment.salt ? 'Yes' : 'No'}`);
+      console.log(`  - Has nonce: ${remoteAttachment.nonce ? 'Yes' : 'No'}`);
+      console.log(`  - Has secret: ${remoteAttachment.secret ? 'Yes' : 'No'}`);
+
+      // Load the remote attachment using our utility function
+      // This provides better error handling for common issues
+      const attachment = await loadRemoteAttachment(
+        remoteAttachment,
         agent.client
       );
 
       console.log(`📄 Attachment info: ${attachment.filename || 'unnamed'} (${attachment.mimeType})`);
 
       // Check if it's an image
-      if (!attachment.mimeType.startsWith('image/')) {
+      if (!isImage(attachment.mimeType)) {
         await ctx.conversation.send(
-          '❌ Sorry, I can only process image files (JPEG, PNG).\n\n' +
+          '❌ Sorry, I can only process image files.\n\n' +
           'Please send a photo of your receipt!'
         );
         return;
       }
 
+      // Check if it's a supported image format
+      if (!isSupportedImageFormat(attachment.mimeType)) {
+        await ctx.conversation.send(
+          `❌ Sorry, the image format "${attachment.mimeType}" is not supported.\n\n` +
+          'Please send your receipt as JPEG, PNG, or WebP.'
+        );
+        return;
+      }
+
       // Convert to base64 for GPT-4o Vision
-      const base64Image = Buffer.from(attachment.data).toString('base64');
+      const base64Image = attachmentToBase64(attachment.data);
 
       console.log('🔍 Analyzing receipt with GPT-4o Vision...');
       await ctx.conversation.send('🔍 Analyzing your receipt... This may take a few seconds.');
