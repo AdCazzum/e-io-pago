@@ -22,30 +22,38 @@ export async function analyzeReceipt(
     messages: [
       {
         role: 'system',
-        content: `You are a receipt analysis expert. Extract all information from receipts and return structured JSON data with these fields:
-        - merchant: string (store/restaurant name)
-        - date: string (transaction date, if visible, in YYYY-MM-DD format)
-        - items: array of {name: string, price: number, quantity: number}
-        - subtotal: number (before tax)
-        - tax: number
-        - tip: number (if applicable, otherwise 0)
-        - total: number (final amount)
-        - currency: string (USD, EUR, etc.)
+        content: `You are a receipt analysis expert. Your task is to determine if an image is a receipt, and if so, extract all information.
 
-        Be precise with numbers. If a field is not clearly visible, use reasonable defaults:
-        - date: null if not visible
-        - quantity: 1 if not specified
-        - tip: 0 if not applicable
-        - currency: "USD" if not specified
+IMPORTANT: First check if this is actually a receipt (restaurant bill, shop receipt, invoice with itemized purchases). If it's NOT a receipt (e.g., a photo of people, landscape, meme, random document), respond with:
+{"isReceipt": false}
 
-        Extract ALL items visible on the receipt. Be thorough and accurate.`,
+If it IS a receipt, return structured JSON data with these fields:
+{
+  "isReceipt": true,
+  "merchant": string (store/restaurant name),
+  "date": string (transaction date in YYYY-MM-DD format, or null),
+  "items": array of {name: string, price: number, quantity: number},
+  "subtotal": number (before tax),
+  "tax": number,
+  "tip": number (if applicable, otherwise 0),
+  "total": number (final amount),
+  "currency": string (USD, EUR, etc.)
+}
+
+Defaults for missing fields:
+- date: null if not visible
+- quantity: 1 if not specified
+- tip: 0 if not applicable
+- currency: "USD" if not specified
+
+Extract ALL items visible on the receipt.`,
       },
       {
         role: 'user',
         content: [
           {
             type: 'text',
-            text: 'Analyze this receipt image and extract all data in the specified JSON format. Be thorough and extract every item visible.',
+            text: 'First, determine if this is a receipt. If yes, extract all data in the specified JSON format. If no, return {"isReceipt": false}.',
           },
           {
             type: 'image_url',
@@ -67,7 +75,16 @@ export async function analyzeReceipt(
     throw new Error('No response from GPT-4o Vision API');
   }
 
-  const receiptData = JSON.parse(result) as ReceiptData;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const parsedResult = JSON.parse(result);
+
+  // Check if GPT-4o determined this is not a receipt
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  if (parsedResult.isReceipt === false) {
+    throw new Error('Image does not appear to be a valid receipt');
+  }
+
+  const receiptData = parsedResult as ReceiptData;
 
   // Validate the data
   if (!validateReceiptData(receiptData)) {

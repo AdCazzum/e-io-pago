@@ -166,7 +166,6 @@ async function main() {
 
     console.log(`✅ Triggered in group with: "${triggerWord}"`);
 
-
     // Remove trigger word from message for processing (if present)
     let messageToProcess = originalMessage;
     if (text.startsWith(triggerWord)) {
@@ -270,74 +269,48 @@ async function main() {
 
     console.log(`📎 ${isGroup ? '👥 Group' : '💬 DM'} attachment from ${sender}`);
 
-    // If it's a DM, send message that agent only works in groups
+    // If it's a DM, ignore silently (agent only works in groups)
     if (isDm) {
-      console.log(`⏭️  DM attachment received - informing user to use in groups`);
-      const triggerWord = process.env.AGENT_TRIGGER || '@eiopago';
-      await ctx.conversation.send(
-        `👋 Hi! I'm a group expense splitting agent.\n\n` +
-        `Please add me to a group chat and tag me with "${triggerWord}" to use me.\n\n` +
-        `Example: ${triggerWord} help`
-      );
+      console.log(`⏭️  DM attachment received - ignoring silently`);
       return;
     }
 
     // Rate limiting check
     if (!checkRateLimit(sender)) {
       console.log(`⏱️  Rate limited: ${sender}`);
-      await ctx.conversation.send('Please wait a moment before sending another request. ⏱️');
-      return;
+      return; // Silently ignore rate-limited attachments
     }
 
     try {
       console.log('📥 Downloading and decrypting attachment...');
 
-      // Debug: Log the attachment metadata to understand what we're receiving
+      // Load the remote attachment
       const remoteAttachment = ctx.message.content;
-      console.log('🔍 Debug - Remote Attachment Metadata:');
-      console.log(`  - URL: ${remoteAttachment.url}`);
-      console.log(`  - Scheme: ${remoteAttachment.scheme}`);
-      console.log(`  - Filename: ${remoteAttachment.filename}`);
-      console.log(`  - Content Length: ${remoteAttachment.contentLength}`);
-      console.log(`  - Has digest: ${remoteAttachment.contentDigest ? 'Yes' : 'No'}`);
-      console.log(`  - Has salt: ${remoteAttachment.salt ? 'Yes' : 'No'}`);
-      console.log(`  - Has nonce: ${remoteAttachment.nonce ? 'Yes' : 'No'}`);
-      console.log(`  - Has secret: ${remoteAttachment.secret ? 'Yes' : 'No'}`);
-
-      // Load the remote attachment using our utility function
-      // This provides better error handling for common issues
       const attachment = await loadRemoteAttachment(
         remoteAttachment,
         agent.client
       );
 
-      console.log(`📄 Attachment info: ${attachment.filename || 'unnamed'} (${attachment.mimeType})`);
+      console.log(`📄 Attachment: ${attachment.filename || 'unnamed'} (${attachment.mimeType})`);
 
-      // Check if it's an image
+      // Only process images - silently ignore other file types
       if (!isImage(attachment.mimeType)) {
-        await ctx.conversation.send(
-          '❌ Sorry, I can only process image files.\n\n' +
-          'Please send a photo of your receipt!'
-        );
+        console.log(`⏭️  Not an image, ignoring`);
         return;
       }
 
-      // Check if it's a supported image format
+      // Only process supported formats - silently ignore others
       if (!isSupportedImageFormat(attachment.mimeType)) {
-        await ctx.conversation.send(
-          `❌ Sorry, the image format "${attachment.mimeType}" is not supported.\n\n` +
-          'Please send your receipt as JPEG, PNG, or WebP.'
-        );
+        console.log(`⏭️  Unsupported image format, ignoring`);
         return;
       }
 
       // Convert to base64 for GPT-4o Vision
       const base64Image = attachmentToBase64(attachment.data);
 
-      console.log('🔍 Analyzing receipt with GPT-4o Vision...');
-      await ctx.conversation.send('🔍 Analyzing your receipt... This may take a few seconds.');
+      console.log('🔍 Analyzing image to detect if it\'s a receipt...');
 
-      // Analyze the receipt
+      // Try to analyze the receipt - this will throw if it's not a receipt
       const receiptData = await analyzeReceipt(base64Image, attachment.mimeType, openai);
 
       console.log(`✅ Receipt analyzed: ${receiptData.merchant}, total: ${receiptData.currency} ${receiptData.total}`);
@@ -371,18 +344,23 @@ async function main() {
       console.log('✅ Split message sent successfully!');
 
     } catch (error) {
-      console.error('❌ Error processing receipt:', error);
+      console.error('❌ Error processing attachment:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
+      // If it's not a receipt or validation failed, ignore silently
+      if (errorMessage.includes('not a receipt') ||
+          errorMessage.includes('not appear to be') ||
+          errorMessage.includes('cannot extract') ||
+          errorMessage.includes('valid receipt')) {
+        console.log('⏭️  Not a valid receipt, ignoring silently');
+        return;
+      }
+
+      // For actual processing errors (download, network, API), send user-friendly message
       await ctx.conversation.send(
-        createErrorMessage(
-          errorMessage.includes('image') || errorMessage.includes('quality')
-            ? 'image-quality'
-            : errorMessage.includes('valid')
-            ? 'validation'
-            : 'processing'
-        )
+        '❌ Sorry, I encountered an error while processing your receipt. ' +
+        'Please try sending the image again, or make sure the receipt is clear and readable.'
       );
     }
   });

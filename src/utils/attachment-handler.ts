@@ -16,9 +16,9 @@ import type { CodecRegistry } from '@xmtp/content-type-primitives';
  * Order matters - faster/more reliable gateways first
  */
 const PUBLIC_IPFS_GATEWAYS = [
+  'https://dweb.link',
   'https://ipfs.io',
   'https://cloudflare-ipfs.com',
-  'https://dweb.link',
 ] as const;
 
 /**
