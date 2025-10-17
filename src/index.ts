@@ -22,6 +22,21 @@ import {
   isSupportedImageFormat,
   attachmentToBase64,
 } from './utils/attachment-handler.js';
+import {
+  inlineActionsMiddleware,
+  registerAction,
+} from './utils/inline-actions/inline-actions.js';
+import { ActionsCodec } from './utils/inline-actions/types/ActionsContent.js';
+import { IntentCodec } from './utils/inline-actions/types/IntentContent.js';
+import {
+  createExpenseApproval,
+  getExpenseById,
+  recordApproval,
+} from './utils/expense-manager.js';
+import {
+  sendExpenseApprovalDMs,
+  sendApprovalConfirmationDM,
+} from './utils/dm-sender.js';
 
 // Rate limiting map to prevent spam
 const rateLimitMap = new Map<string, number>();
@@ -111,11 +126,126 @@ async function main() {
   // Shutdown flag to prevent processing during shutdown
   let isShuttingDown = false;
 
-  // Create XMTP agent with attachment codecs
+  // Create XMTP agent with attachment codecs and inline actions
   const agent = await Agent.createFromEnv({
-    codecs: [new RemoteAttachmentCodec(), new AttachmentCodec()],
+    codecs: [
+      new RemoteAttachmentCodec(),
+      new AttachmentCodec(),
+      new ActionsCodec(),
+      new IntentCodec(),
+    ],
     env: (process.env.XMTP_ENV || 'dev') as 'dev' | 'production',
   });
+
+  // Register inline actions middleware
+  agent.use(inlineActionsMiddleware);
+
+  // Register action handlers for expense approval
+  // These handlers will be triggered when users click Accept or Reject buttons
+  // Action ID format: accept-expense-{expenseId} or reject-expense-{expenseId}
+  const handleExpenseAction = async (
+    expenseId: string,
+    decision: 'accepted' | 'rejected',
+    ctx: Parameters<typeof registerAction>[1] extends (ctx: infer C) => Promise<void> ? C : never,
+  ): Promise<void> => {
+    console.log(`🎯 Processing ${decision} action for expense ${expenseId}`);
+
+    // Get the expense from the manager
+    const expense = getExpenseById(expenseId);
+
+    if (expense === undefined) {
+      console.error(`❌ Expense not found: ${expenseId}`);
+      await ctx.sendText('❌ This expense approval has expired or is invalid.');
+      return;
+    }
+
+    // Get user's address (from their inbox ID)
+    const userInboxId = ctx.message.senderInboxId;
+    const userAddress = await ctx.getSenderAddress();
+
+    if (userAddress === undefined) {
+      console.error('❌ Could not get sender address');
+      await ctx.sendText('❌ Could not verify your identity. Please try again.');
+      return;
+    }
+
+    // Record the approval
+    const recorded = recordApproval(expenseId, userAddress, decision);
+
+    if (!recorded) {
+      await ctx.sendText('❌ Failed to record your response. Please try again.');
+      return;
+    }
+
+    // Send confirmation DM to the user
+    await sendApprovalConfirmationDM(
+      agent,
+      userInboxId,
+      decision,
+      expense.perPersonAmount,
+      expense.receiptData.currency,
+    );
+
+    // Send announcement to the group
+    try {
+      const groupConversation = await agent.client.conversations.getConversationById(
+        expense.groupConversationId,
+      );
+
+      if (groupConversation === undefined) {
+        console.error('❌ Could not find group conversation');
+        return;
+      }
+
+      const emoji = decision === 'accepted' ? '✅' : '❌';
+      const action = decision === 'accepted' ? 'accepted' : 'rejected';
+      const shortAddress = `${userAddress.substring(0, 6)}...${userAddress.substring(userAddress.length - 4)}`;
+
+      const announcement = `${emoji} ${shortAddress} ${action} the expense of ${expense.perPersonAmount.toFixed(2)} ${expense.receiptData.currency}`;
+
+      await groupConversation.send(announcement);
+
+      console.log(`✅ Sent announcement to group for ${userAddress}`);
+    } catch (error) {
+      console.error(
+        '❌ Error sending group announcement:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  };
+
+  // Register dynamic action handlers
+  // We'll register handlers as expenses are created, but also set up a fallback handler
+  // that can handle any expense action dynamically
+  const expenseActionPattern = /^(accept|reject)-expense-(.+)$/;
+
+  // Use a generic handler that parses the action ID
+  const genericExpenseHandler = async (ctx: Parameters<typeof registerAction>[1] extends (ctx: infer C) => Promise<void> ? C : never): Promise<void> => {
+    // Get the action ID from the intent content
+    const intentContent = ctx.message.content as { actionId?: string };
+    const actionId = intentContent.actionId ?? '';
+
+    const match = expenseActionPattern.exec(actionId);
+
+    if (match === null) {
+      console.error(`❌ Invalid expense action format: ${actionId}`);
+      await ctx.sendText('❌ Invalid action format.');
+      return;
+    }
+
+    const decision = match[1] === 'accept' ? 'accepted' : 'rejected';
+    const expenseId = match[2];
+
+    await handleExpenseAction(expenseId, decision as 'accepted' | 'rejected', ctx);
+  };
+
+  // We'll need to register handlers dynamically when expenses are created
+  // For now, we'll just keep track of this handler function to use later
+  const registerExpenseActionHandlers = (expenseId: string): void => {
+    registerAction(`accept-expense-${expenseId}`, genericExpenseHandler);
+    registerAction(`reject-expense-${expenseId}`, genericExpenseHandler);
+    console.log(`✅ Registered action handlers for expense ${expenseId}`);
+  };
 
   // Handle agent startup
   agent.on('start', () => {
@@ -332,7 +462,7 @@ async function main() {
 
       console.log(`💰 Split calculated: ${receiptData.currency} ${perPerson} per person (${numberOfPeople} people)`);
 
-      // Generate and send the split message
+      // Generate and send the split message to the group
       const splitMessage = generateSplitMessage(
         receiptData,
         numberOfPeople,
@@ -342,6 +472,28 @@ async function main() {
 
       await ctx.conversation.send(splitMessage);
       console.log('✅ Split message sent successfully!');
+
+      // NEW: Create expense approval and send DMs to all members
+      console.log('📨 Creating expense approval workflow...');
+
+      // Create the expense approval record
+      const expense = createExpenseApproval(
+        receiptData,
+        perPerson,
+        numberOfPeople,
+        ctx.conversation.id,
+      );
+
+      // Register action handlers for this specific expense
+      registerExpenseActionHandlers(expense.expenseId);
+
+      // Get member inbox IDs
+      const memberInboxIds = members.map((member) => member.inboxId);
+
+      // Send DM to each member with approval buttons
+      await sendExpenseApprovalDMs(agent, expense, memberInboxIds);
+
+      console.log('✅ Expense approval workflow initiated!');
 
     } catch (error) {
       console.error('❌ Error processing attachment:', error);

@@ -25,6 +25,7 @@
   "license": "MIT",
   "dependencies": {
     "@xmtp/agent-sdk": "latest",
+    "@xmtp/content-type-primitives": "^2.0.2",
     "@xmtp/content-type-remote-attachment": "latest",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.0",
