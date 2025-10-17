@@ -7,12 +7,13 @@
 import 'dotenv/config';
 import { Agent, filter } from '@xmtp/agent-sdk';
 import { getTestUrl } from '@xmtp/agent-sdk/debug';
+import { RemoteAttachmentCodec, AttachmentCodec } from '@xmtp/content-type-remote-attachment';
+import type { Attachment } from '@xmtp/content-type-remote-attachment';
 import OpenAI from 'openai';
 
-import { analyzeReceipt, validateReceiptData, calculateSplit } from './utils/receipt-analyzer.js';
+import { analyzeReceipt, calculateSplit } from './utils/receipt-analyzer.js';
 import {
   generateSplitMessage,
-  createFallbackMessage,
   createHelpMessage,
   createErrorMessage,
 } from './utils/message-formatter.js';
@@ -102,8 +103,12 @@ async function main() {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
-  // Create XMTP agent
+  // Shutdown flag to prevent processing during shutdown
+  let isShuttingDown = false;
+
+  // Create XMTP agent with attachment codecs
   const agent = await Agent.createFromEnv({
+    codecs: [new RemoteAttachmentCodec(), new AttachmentCodec()],
     env: (process.env.XMTP_ENV || 'dev') as 'dev' | 'production',
   });
 
@@ -118,6 +123,9 @@ async function main() {
 
   // Handle text messages
   agent.on('text', async (ctx) => {
+    // Skip if shutting down
+    if (isShuttingDown) return;
+
     // Skip own messages to prevent loops
     if (filter.fromSelf(ctx.message, ctx.client)) return;
 
@@ -190,6 +198,9 @@ async function main() {
   // Handle replies (when someone replies to agent's message)
   // This is the "native" way to mention/tag the agent
   agent.on('reply', async (ctx) => {
+    // Skip if shutting down
+    if (isShuttingDown) return;
+
     // Skip own messages
     if (filter.fromSelf(ctx.message, ctx.client)) {
       return;
@@ -232,10 +243,152 @@ async function main() {
     await ctx.conversation.send(response);
   });
 
+  // Handle attachments (images, files)
+  agent.on('attachment', async (ctx) => {
+    // Skip if shutting down
+    if (isShuttingDown) return;
+
+    // Skip own messages
+    if (filter.fromSelf(ctx.message, ctx.client)) {
+      return;
+    }
+
+    const sender = await ctx.getSenderAddress();
+    if (sender === undefined) {
+      console.log('⚠️  Could not get sender address, skipping attachment');
+      return;
+    }
+
+    // Check if this is a group conversation
+    const isDm = filter.isDM(ctx.conversation);
+    const isGroup = !isDm;
+
+    console.log(`📎 ${isGroup ? '👥 Group' : '💬 DM'} attachment from ${sender}`);
+
+    // If it's a DM, send message that agent only works in groups
+    if (isDm) {
+      console.log(`⏭️  DM attachment received - informing user to use in groups`);
+      const triggerWord = process.env.AGENT_TRIGGER || '@eiopago';
+      await ctx.conversation.send(
+        `👋 Hi! I'm a group expense splitting agent.\n\n` +
+        `Please add me to a group chat and tag me with "${triggerWord}" to use me.\n\n` +
+        `Example: ${triggerWord} help`
+      );
+      return;
+    }
+
+    // Rate limiting check
+    if (!checkRateLimit(sender)) {
+      console.log(`⏱️  Rate limited: ${sender}`);
+      await ctx.conversation.send('Please wait a moment before sending another request. ⏱️');
+      return;
+    }
+
+    try {
+      console.log('📥 Downloading and decrypting attachment...');
+
+      // Load the remote attachment - use agent.client instead of ctx.client
+      // The attachment event handler receives RemoteAttachment content
+      const attachment = await RemoteAttachmentCodec.load<Attachment>(
+        ctx.message.content,
+        agent.client
+      );
+
+      console.log(`📄 Attachment info: ${attachment.filename || 'unnamed'} (${attachment.mimeType})`);
+
+      // Check if it's an image
+      if (!attachment.mimeType.startsWith('image/')) {
+        await ctx.conversation.send(
+          '❌ Sorry, I can only process image files (JPEG, PNG).\n\n' +
+          'Please send a photo of your receipt!'
+        );
+        return;
+      }
+
+      // Convert to base64 for GPT-4o Vision
+      const base64Image = Buffer.from(attachment.data).toString('base64');
+
+      console.log('🔍 Analyzing receipt with GPT-4o Vision...');
+      await ctx.conversation.send('🔍 Analyzing your receipt... This may take a few seconds.');
+
+      // Analyze the receipt
+      const receiptData = await analyzeReceipt(base64Image, attachment.mimeType, openai);
+
+      console.log(`✅ Receipt analyzed: ${receiptData.merchant}, total: ${receiptData.currency} ${receiptData.total}`);
+
+      // Get group members count (excluding the bot)
+      const members = await ctx.conversation.members();
+      const numberOfPeople = members.length - 1; // Exclude the bot itself
+
+      if (numberOfPeople <= 0) {
+        await ctx.conversation.send(
+          '❌ I need at least 2 people in the group to split the bill!\n\n' +
+          'Please add more members to the group.'
+        );
+        return;
+      }
+
+      // Calculate the split
+      const perPerson = calculateSplit(receiptData.total, numberOfPeople);
+
+      console.log(`💰 Split calculated: ${receiptData.currency} ${perPerson} per person (${numberOfPeople} people)`);
+
+      // Generate and send the split message
+      const splitMessage = await generateSplitMessage(
+        receiptData,
+        numberOfPeople,
+        perPerson,
+        openai
+      );
+
+      await ctx.conversation.send(splitMessage);
+      console.log('✅ Split message sent successfully!');
+
+    } catch (error) {
+      console.error('❌ Error processing receipt:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      await ctx.conversation.send(
+        createErrorMessage(
+          errorMessage.includes('image') || errorMessage.includes('quality')
+            ? 'image-quality'
+            : errorMessage.includes('valid')
+            ? 'validation'
+            : 'processing'
+        )
+      );
+    }
+  });
+
   // Handle unhandled errors
   agent.on('unhandledError', (error) => {
     console.error('💥 Unhandled error:', error);
   });
+
+  // Graceful shutdown handler
+  const gracefulShutdown = async (signal: string): Promise<void> => {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+
+    console.log(`\n⚠️  Received ${signal}, shutting down gracefully...`);
+
+    try {
+      // Give ongoing operations time to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('✅ Shutdown complete');
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Error during shutdown:', error);
+      process.exit(1);
+    }
+  };
+
+  // Register shutdown handlers
+  process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
 
   // Start the agent
   console.log('🔄 Starting agent...\n');
