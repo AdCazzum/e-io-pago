@@ -16,7 +16,12 @@ dist/
 # XMTP database
 data/
 *.db
+*.db3
+*.db3-shm
+*.db3-wal
 *.sqlite
+*.sqlcipher_salt
+xmtp-*
 
 # Logs
 logs/
