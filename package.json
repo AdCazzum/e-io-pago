@@ -1,0 +1,39 @@
+{
+  "name": "xmtp-receipt-split-agent",
+  "version": "1.0.0",
+  "description": "XMTP agent on Base Network that analyzes receipt images and splits bills equally among group members",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "gen:keys": "tsx scripts/generate-keys.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "xmtp",
+    "agent",
+    "base",
+    "receipt",
+    "bill-split",
+    "gpt-4o"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@xmtp/agent-sdk": "latest",
+    "@xmtp/content-type-remote-attachment": "latest",
+    "openai": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
