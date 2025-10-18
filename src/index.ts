@@ -382,18 +382,23 @@ async function main(): Promise<void> {
       const members = await ctx.conversation.members();
       const numberOfPeople = members.length - 1; // Exclude the bot itself
 
-      if (numberOfPeople <= 0) {
+      // Check if there's only one person (the payer)
+      if (numberOfPeople <= 1) {
         await ctx.conversation.send(
-          '❌ I need at least 2 people in the group to split the bill!\n\n' + 'Please add more members to the group.',
+          '❌ You need at least one other person in the group to split the bill!\n\n' +
+          'You cannot owe money to yourself. Add more members to the group.',
         );
         return;
       }
 
-      // Calculate the split
+      // Calculate the split: total divided by ALL people (including payer)
+      // Each person's share is total/numberOfPeople
+      // The payer paid the full amount, so each other member owes them their share
       const perPerson = calculateSplit(receiptData.total, numberOfPeople);
+      const numberOfDebtors = numberOfPeople - 1; // Number of people who owe the payer
 
       console.log(
-        `💰 Split calculated: ${receiptData.currency} ${perPerson} per person (${numberOfPeople} people)`,
+        `💰 Split calculated: ${receiptData.currency} ${perPerson} per person (${numberOfPeople} people total, ${numberOfDebtors} ${numberOfDebtors === 1 ? 'debtor' : 'debtors'})`,
       );
 
       // Extract IPFS hash from the remote attachment URL
@@ -476,7 +481,7 @@ async function main(): Promise<void> {
 
 🏪 **${receiptData.merchant}**
 💰 Total: **${receiptData.total.toFixed(2)} ${receiptData.currency}**
-👥 Per person: **${perPerson.toFixed(2)} ${receiptData.currency}** (${numberOfPeople} ${numberOfPeople === 1 ? 'person' : 'people'})
+👥 Each member owes: **${perPerson.toFixed(2)} ${receiptData.currency}** (${numberOfDebtors} ${numberOfDebtors === 1 ? 'debtor' : 'debtors'})
 
 ${ipfsUrl !== '' ? `📸 Receipt: ${ipfsUrl}\n` : ''}
 ${txHash !== '' ? `⛓️  Transaction: https://sepolia.basescan.org/tx/${txHash}\n` : ''}

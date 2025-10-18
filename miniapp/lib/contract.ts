@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import ExpenseManagerABI from './contracts/ExpenseManager.json';
+import ExpenseManagerABI from '../../contracts/ExpenseManager.json';
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_EXPENSE_CONTRACT_ADDRESS ?? '';
 

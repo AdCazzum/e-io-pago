@@ -185,6 +185,7 @@ contract ExpenseManager is ERC2771Context, ReentrancyGuard {
     /**
      * @notice Adds a new expense to a group
      * @param groupId The group this expense belongs to
+     * @param payer The address of the person who paid (creditor)
      * @param merchant Merchant name
      * @param totalAmount Total amount of the expense
      * @param perPersonAmount Amount each person owes
@@ -194,6 +195,7 @@ contract ExpenseManager is ERC2771Context, ReentrancyGuard {
      */
     function addExpense(
         string memory groupId,
+        address payer,
         string memory merchant,
         uint256 totalAmount,
         uint256 perPersonAmount,
@@ -205,9 +207,10 @@ contract ExpenseManager is ERC2771Context, ReentrancyGuard {
         require(perPersonAmount > 0, "Per person amount must be greater than 0");
         require(bytes(merchant).length > 0, "Merchant name required");
         require(bytes(ipfsHash).length > 0, "IPFS hash required");
+        require(payer != address(0), "Invalid payer address");
+        require(isGroupMember(groupId, payer), "Payer must be a group member");
 
         uint256 expenseId = expenseCounter++;
-        address payer = _msgSender();
 
         // Get all members except the payer
         address[] memory participants = new address[](groups[groupId].members.length - 1);

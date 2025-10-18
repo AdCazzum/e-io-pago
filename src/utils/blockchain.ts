@@ -5,7 +5,7 @@
 
 import { ethers } from 'ethers';
 
-import ExpenseManagerArtifact from '../contracts/ExpenseManager.json' assert { type: 'json' };
+import ExpenseManagerArtifact from '../../contracts/ExpenseManager.json' assert { type: 'json' };
 
 import type { ReceiptData } from '../types.js';
 
@@ -183,6 +183,7 @@ export async function addExpenseOnchain(
     // Call smart contract
     const tx = await contract.addExpense(
       groupId,
+      payerAddress, // The actual person who paid (creditor)
       receiptData.merchant,
       totalAmountWei,
       perPersonAmountWei,
