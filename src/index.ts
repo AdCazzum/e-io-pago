@@ -483,9 +483,9 @@ async function main(): Promise<void> {
 💰 Total: **${receiptData.total.toFixed(2)} ${receiptData.currency}**
 👥 Each member owes: **${perPerson.toFixed(2)} ${receiptData.currency}** (${numberOfDebtors} ${numberOfDebtors === 1 ? 'debtor' : 'debtors'})
 
-${ipfsUrl !== '' ? `📸 Receipt: ${ipfsUrl}\n` : ''}
-${txHash !== '' ? `⛓️  Transaction: https://sepolia.basescan.org/tx/${txHash}\n` : ''}
-${groupUrl !== '' ? `📊 View your debts: ${groupUrl}\n` : ''}
+${ipfsUrl !== '' ? `📸 [View receipt](${ipfsUrl})\n` : ''}
+${txHash !== '' ? `⛓️  [View transaction](https://sepolia.basescan.org/tx/${txHash})\n` : ''}
+${groupUrl !== '' ? `📊 [Check your debts](${groupUrl})\n` : ''}
 ✅ **Expense saved on-chain!**`;
 
       // Reply to the analyzing message with the result
