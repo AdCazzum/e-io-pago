@@ -14,15 +14,15 @@ export function AddressDisplay({ address, showAvatar = true }: AddressDisplayPro
   const chain = useLocalNetwork ? baseSepolia : baseSepolia; // Always Base Sepolia for now
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 min-w-0">
       {showAvatar && (
         <Avatar
           address={address as `0x${string}`}
           chain={chain}
-          className="w-8 h-8 rounded-full"
+          className="w-8 h-8 rounded-full flex-shrink-0"
         />
       )}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <Name
           address={address as `0x${string}`}
           chain={chain}

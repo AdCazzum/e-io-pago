@@ -4,7 +4,6 @@ import { useParams } from 'next/navigation'
 import { useAccount } from 'wagmi'
 import { useEffect, useState } from 'react'
 import { getGroupExpenses, formatEther, formatAddress, type ExpenseData } from '@/lib/contract'
-import { ConnectWallet } from '@coinbase/onchainkit/wallet'
 import Link from 'next/link'
 
 function getIPFSUrl(ipfsHash: string): string {
@@ -47,12 +46,17 @@ export default function ExpensesPage() {
         <div className="bg-white rounded-2xl shadow-xl p-12 text-center max-w-md">
           <div className="text-6xl mb-6">🔐</div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Connect Your Wallet
+            Wallet Not Connected
           </h2>
           <p className="text-gray-600 mb-8">
-            Please connect your Base wallet to view expenses.
+            Please connect your Base wallet from the group dashboard to view expenses.
           </p>
-          <ConnectWallet />
+          <Link
+            href={`/group/${groupId}`}
+            className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            ← Back to Dashboard
+          </Link>
         </div>
       </div>
     )
@@ -73,15 +77,12 @@ export default function ExpensesPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <header className="mb-8 flex items-center justify-between">
-          <div>
-            <Link href={`/group/${groupId}`} className="text-blue-600 hover:text-blue-800 mb-2 inline-block">
-              ← Back to Dashboard
-            </Link>
-            <h1 className="text-4xl font-bold text-gray-900">All Expenses</h1>
-            <p className="text-gray-600 mt-2">Group ID: {groupId}</p>
-          </div>
-          <ConnectWallet />
+        <header className="mb-8">
+          <Link href={`/group/${groupId}`} className="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+            ← Back to Dashboard
+          </Link>
+          <h1 className="text-4xl font-bold text-gray-900">All Expenses</h1>
+          <p className="text-gray-600 mt-2">Group ID: {groupId}</p>
         </header>
 
         {/* Expenses List */}
