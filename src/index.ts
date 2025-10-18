@@ -52,56 +52,6 @@ function checkRateLimit(userAddress: string): boolean {
 }
 
 /**
- * Generates a natural conversational response using GPT-4o
- */
-async function generateConversationalResponse(
-  userMessage: string,
-  openai: OpenAI,
-): Promise<string> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a helpful, friendly Receipt Split Agent for XMTP group chats. Your main purpose is to help groups split bills by analyzing receipt images and saving them on-chain.
-
-Your personality:
-- Friendly and conversational
-- Helpful and supportive
-- Use emojis occasionally but not excessively
-- Keep responses concise (2-3 sentences max)
-- Always relate back to your main purpose when appropriate
-
-Key information about you:
-- You analyze receipt images using GPT-4o Vision
-- You save all expenses on the blockchain (Base Network)
-- Expenses are automatically split equally among all group members
-- Users can view debits and expenses in a mini-app
-- All data is stored on-chain permanently
-
-When users ask what you do, explain your receipt splitting and on-chain storage functionality.
-When users greet you, be warm and welcoming.
-When users ask questions, answer helpfully and encourage them to try sending a receipt.`,
-        },
-        {
-          role: 'user',
-          content: userMessage,
-        },
-      ],
-      max_tokens: 150,
-      temperature: 0.8,
-    });
-
-    return response.choices[0].message.content ?? 'Hello! How can I help you today?';
-  } catch (error) {
-    console.error('Error generating conversational response:', error);
-    // Fallback to simple response
-    return "I'm here to help you split bills! Send me a receipt image and I'll analyze it and save it on-chain. Type 'help' for more info.";
-  }
-}
-
-/**
  * Main agent function
  */
 async function main(): Promise<void> {
@@ -318,11 +268,15 @@ async function main(): Promise<void> {
       return;
     }
 
-    // All other messages - use GPT for natural responses
-    console.log('🤖 Generating GPT response...');
-    const response = await generateConversationalResponse(messageToProcess, openai);
-    console.log(`✅ GPT response: "${response}"`);
-    await ctx.conversation.send(response);
+    // All other messages - show help instead of GPT response
+    console.log('⚠️  Unrecognized command - showing help');
+    const helpMsg = createHelpMessage();
+    const helpReply: Reply = {
+      reference: ctx.message.id,
+      content: helpMsg,
+      contentType: ContentTypeText,
+    };
+    await ctx.conversation.send(helpReply, ContentTypeReply);
   });
 
   // Handle replies (when someone replies to agent's message)
@@ -370,11 +324,15 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Generate GPT response for the reply
-    console.log('🤖 Generating GPT response to reply...');
-    const response = await generateConversationalResponse(String(messageContent), openai);
-    console.log(`✅ GPT response: "${response}"`);
-    await ctx.conversation.send(response);
+    // Show help for unrecognized reply
+    console.log('⚠️  Unrecognized reply - showing help');
+    const helpMsg = createHelpMessage();
+    const helpReply: Reply = {
+      reference: ctx.message.id,
+      content: helpMsg,
+      contentType: ContentTypeText,
+    };
+    await ctx.conversation.send(helpReply, ContentTypeReply);
   });
 
   // Handle attachments (images, files)
