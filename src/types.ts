@@ -43,16 +43,3 @@ export interface AgentConfig {
   dbPath?: string;
   openaiApiKey: string;
 }
-
-/**
- * Expense approval tracking
- */
-export interface ExpenseApproval {
-  expenseId: string;
-  receiptData: ReceiptData;
-  perPersonAmount: number;
-  numberOfPeople: number;
-  approvals: Map<string, 'accepted' | 'rejected'>;
-  groupConversationId: string;
-  createdAt: Date;
-}
