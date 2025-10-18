@@ -31,6 +31,7 @@
     "@xmtp/agent-sdk": "latest",
     "@xmtp/content-type-primitives": "^2.0.2",
     "@xmtp/content-type-remote-attachment": "latest",
+    "@xmtp/content-type-reply": "^2.0.2",
     "dotenv": "^16.4.5",
     "openai": "^4.0.0"
   },

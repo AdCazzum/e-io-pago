@@ -8,6 +8,8 @@ import 'dotenv/config';
 import { Agent, filter, IdentifierKind } from '@xmtp/agent-sdk';
 import { getTestUrl } from '@xmtp/agent-sdk/debug';
 import { RemoteAttachmentCodec, AttachmentCodec } from '@xmtp/content-type-remote-attachment';
+import { ContentTypeReply, ReplyCodec, type Reply } from '@xmtp/content-type-reply';
+import { ContentTypeText } from '@xmtp/content-type-text';
 import OpenAI from 'openai';
 
 import { analyzeReceipt, calculateSplit } from './utils/receipt-analyzer.js';
@@ -109,9 +111,9 @@ async function main(): Promise<void> {
   // Shutdown flag to prevent processing during shutdown
   let isShuttingDown = false;
 
-  // Create XMTP agent with attachment codecs
+  // Create XMTP agent with attachment and reply codecs
   const agent = await Agent.createFromEnv({
-    codecs: [new RemoteAttachmentCodec(), new AttachmentCodec()],
+    codecs: [new RemoteAttachmentCodec(), new AttachmentCodec(), new ReplyCodec()],
     env: (process.env.XMTP_ENV ?? 'dev') as 'dev' | 'production',
   });
 
@@ -332,6 +334,9 @@ async function main(): Promise<void> {
       return; // Silently ignore rate-limited attachments
     }
 
+    // Variable to store analyzing message ID for error handling
+    let analyzingMessageId: string | undefined;
+
     try {
       console.log('📥 Downloading and decrypting attachment...');
 
@@ -355,6 +360,14 @@ async function main(): Promise<void> {
 
       // Convert to base64 for GPT-4o Vision
       const base64Image = attachmentToBase64(attachment.data);
+
+      // Reply to user's message with analyzing status
+      const analyzingReply: Reply = {
+        reference: ctx.message.id,
+        content: '🔍 Analyzing your receipt...',
+        contentType: ContentTypeText,
+      };
+      analyzingMessageId = await ctx.conversation.send(analyzingReply, ContentTypeReply);
 
       console.log("🔍 Analyzing image to detect if it's a receipt...");
 
@@ -459,40 +472,67 @@ async function main(): Promise<void> {
       const miniappUrl = process.env.MINIAPP_URL ?? '';
       const groupUrl = miniappUrl !== '' ? `${miniappUrl}/group/${ctx.conversation.id}` : '';
 
-      const message = `📝 **Nuova spesa aggiunta da ${sender.substring(0, 6)}...${sender.substring(sender.length - 4)}**
+      const message = `📝 **New expense added by ${sender.substring(0, 6)}...${sender.substring(sender.length - 4)}**
 
 🏪 **${receiptData.merchant}**
-💰 Totale: **${receiptData.total.toFixed(2)} ${receiptData.currency}**
-👥 Per persona: **${perPerson.toFixed(2)} ${receiptData.currency}** (${numberOfPeople} ${numberOfPeople === 1 ? 'persona' : 'persone'})
+💰 Total: **${receiptData.total.toFixed(2)} ${receiptData.currency}**
+👥 Per person: **${perPerson.toFixed(2)} ${receiptData.currency}** (${numberOfPeople} ${numberOfPeople === 1 ? 'person' : 'people'})
 
-${ipfsUrl !== '' ? `📸 Ricevuta: ${ipfsUrl}\n` : ''}
-${txHash !== '' ? `⛓️  Transazione: https://sepolia.basescan.org/tx/${txHash}\n` : ''}
-${groupUrl !== '' ? `📊 Vedi i tuoi debiti: ${groupUrl}\n` : ''}
-✅ **Spesa salvata on-chain!**`;
+${ipfsUrl !== '' ? `📸 Receipt: ${ipfsUrl}\n` : ''}
+${txHash !== '' ? `⛓️  Transaction: https://sepolia.basescan.org/tx/${txHash}\n` : ''}
+${groupUrl !== '' ? `📊 View your debts: ${groupUrl}\n` : ''}
+✅ **Expense saved on-chain!**`;
 
-      await ctx.conversation.send(message);
+      // Reply to the analyzing message with the result
+      const resultReply: Reply = {
+        reference: analyzingMessageId,
+        content: message,
+        contentType: ContentTypeText,
+      };
+      await ctx.conversation.send(resultReply, ContentTypeReply);
       console.log('✅ Split message sent successfully!');
     } catch (error) {
       console.error('❌ Error processing attachment:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-      // If it's not a receipt or validation failed, ignore silently
+      // If it's not a receipt or validation failed, send a courtesy message
       if (
         errorMessage.includes('not a receipt') ||
         errorMessage.includes('not appear to be') ||
         errorMessage.includes('cannot extract') ||
         errorMessage.includes('valid receipt')
       ) {
-        console.log('⏭️  Not a valid receipt, ignoring silently');
+        console.log('⏭️  Not a valid receipt, sending courtesy message');
+
+        // Reply to analyzing message if we sent one
+        if (analyzingMessageId !== undefined) {
+          const courtesyReply: Reply = {
+            reference: analyzingMessageId,
+            content: 'Thank you for sharing! However, this doesn\'t appear to be a receipt. ' +
+              'Please send a clear photo of a receipt so I can help split the bill for your group.',
+            contentType: ContentTypeText,
+          };
+          await ctx.conversation.send(courtesyReply, ContentTypeReply);
+        }
         return;
       }
 
       // For actual processing errors (download, network, API), send user-friendly message
-      await ctx.conversation.send(
-        '❌ Sorry, I encountered an error while processing your receipt. ' +
-        'Please try sending the image again, or make sure the receipt is clear and readable.',
-      );
+      if (analyzingMessageId !== undefined) {
+        const errorReply: Reply = {
+          reference: analyzingMessageId,
+          content: '❌ Sorry, I encountered an error while processing your receipt. ' +
+            'Please try sending the image again, or make sure the receipt is clear and readable.',
+          contentType: ContentTypeText,
+        };
+        await ctx.conversation.send(errorReply, ContentTypeReply);
+      } else {
+        await ctx.conversation.send(
+          '❌ Sorry, I encountered an error while processing your receipt. ' +
+          'Please try sending the image again, or make sure the receipt is clear and readable.',
+        );
+      }
     }
   });
 

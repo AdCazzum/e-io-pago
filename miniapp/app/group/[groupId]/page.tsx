@@ -6,12 +6,12 @@ import { useEffect, useState } from 'react';
 import {
   getUserDebtsAndCredits,
   formatEther,
-  formatAddress,
   type DebtInfo,
   type CreditInfo,
 } from '@/lib/contract';
 import { ConnectWallet } from '@coinbase/onchainkit/wallet';
 import Link from 'next/link';
+import { AddressDisplay } from '@/components/AddressDisplay';
 
 export default function GroupPage() {
   const params = useParams();
@@ -175,10 +175,8 @@ export default function GroupPage() {
                 <div key={index} className="bg-white rounded-2xl shadow p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 mb-1">You owe</p>
-                      <p className="font-mono text-sm text-gray-700 truncate">
-                        {formatAddress(debt.creditor)}
-                      </p>
+                      <p className="text-xs text-gray-500 mb-2">You owe</p>
+                      <AddressDisplay address={debt.creditor} />
                     </div>
                     <div className="text-right ml-3">
                       <p className="text-xl font-bold text-red-600">
@@ -204,10 +202,8 @@ export default function GroupPage() {
                 <div key={index} className="bg-white rounded-2xl shadow p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 mb-1">Owes you</p>
-                      <p className="font-mono text-sm text-gray-700 truncate">
-                        {formatAddress(credit.debtor)}
-                      </p>
+                      <p className="text-xs text-gray-500 mb-2">Owes you</p>
+                      <AddressDisplay address={credit.debtor} />
                     </div>
                     <div className="text-right ml-3">
                       <p className="text-xl font-bold text-green-600">
