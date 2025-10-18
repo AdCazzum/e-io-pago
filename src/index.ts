@@ -30,7 +30,7 @@ import {
   attachmentToBase64,
 } from './utils/attachment-handler.js';
 import { ensureGroupExists, addExpenseOnchain } from './utils/blockchain.js';
-import { handlePaidCommand, handlePayCommand, handleStatusCommand } from './utils/payment-handler.js';
+import { handlePaidCommand, handleStatusCommand } from './utils/payment-handler.js';
 
 // Rate limiting map to prevent spam
 const rateLimitMap = new Map<string, number>();
@@ -252,7 +252,12 @@ async function main(): Promise<void> {
     const processedLower = messageToProcess.toLowerCase().trim();
     if (processedLower === 'help' || processedLower === '/help' || processedLower === '?') {
       const helpMsg = createHelpMessage();
-      await ctx.conversation.send(helpMsg);
+      const helpReply: Reply = {
+        reference: ctx.message.id,
+        content: helpMsg,
+        contentType: ContentTypeText,
+      };
+      await ctx.conversation.send(helpReply, ContentTypeReply);
       return;
     }
 
@@ -313,31 +318,6 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Pay command - create USDC payment transaction
-    if (processedLower.startsWith('pay ') || processedLower.startsWith('paga ')) {
-      const parts = processedLower.split(' ');
-      if (parts.length < 2) {
-        await ctx.conversation.send(
-          '❌ Usage: `@eiopago pay <creditor>`\n\n' +
-          'Tag the creditor using basename or address:\n' +
-          '• `@eiopago pay alice.base.eth`\n' +
-          '• `@eiopago pay @alice.base.eth`\n' +
-          '• `@eiopago pay 0x123...`\n' +
-          '• `@eiopago pay @0x123...`\n\n' +
-          '💡 This will create a USDC payment transaction.',
-        );
-        return;
-      }
-
-      const identifier = parts.slice(1).join(' '); // Support names with spaces
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const conversation = ctx.conversation as any;
-      const groupId = conversation.id as string;
-
-      await handlePayCommand(groupId, sender, identifier, ctx.conversation, ctx.message.id, agent.address);
-      return;
-    }
-
     // All other messages - use GPT for natural responses
     console.log('🤖 Generating GPT response...');
     const response = await generateConversationalResponse(messageToProcess, openai);
@@ -381,7 +361,12 @@ async function main(): Promise<void> {
     const text = String(messageContent).toLowerCase().trim();
     if (text === 'help' || text === '/help' || text === '?') {
       const helpMsg = createHelpMessage();
-      await ctx.conversation.send(helpMsg);
+      const helpReply: Reply = {
+        reference: ctx.message.id,
+        content: helpMsg,
+        contentType: ContentTypeText,
+      };
+      await ctx.conversation.send(helpReply, ContentTypeReply);
       return;
     }
 
@@ -588,7 +573,7 @@ ${txHash !== '' ? `⛓️  [View transaction](https://sepolia.basescan.org/tx/${
 ${groupUrl !== '' ? `📊 [Check your debts](${groupUrl})\n` : ''}
 ✅ **Expense saved on-chain!**
 
-💡 Use \`@eiopago status\` to see your balance or \`@eiopago pay <id>\` to pay with USDC.`;
+💡 Use \`@eiopago status\` to see your balance or \`@eiopago paid <creditor>\` to mark debts as paid.`;
 
       // Reply to the analyzing message with the result
       const resultReply: Reply = {

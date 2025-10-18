@@ -1,11 +1,10 @@
 /**
  * Payment handling utilities
- * Handles "paid" and "pay" commands for debt settlement
+ * Handles "paid" command for debt settlement
  */
 
 import { ContentTypeReply, type Reply } from '@xmtp/content-type-reply';
 import { ContentTypeText } from '@xmtp/content-type-text';
-import { ContentTypeWalletSendCalls } from '@xmtp/content-type-wallet-send-calls';
 
 import { resolveCreditorAddress } from './address-resolver.js';
 import {
@@ -15,7 +14,6 @@ import {
   batchMarkDebtsAsPaid,
   findExpensesByCreditor,
 } from './blockchain.js';
-import { createUSDCTransferCalls, amountToUSDC } from './usdc-handler.js';
 
 import type { Conversation } from '@xmtp/agent-sdk';
 
@@ -145,117 +143,6 @@ export async function handlePaidCommand(
 }
 
 /**
- * Handles the "pay <creditor>" command
- * Creates a USDC payment transaction request
- * @param creditor Creditor identifier (basename or address)
- */
-export async function handlePayCommand(
-  groupId: string,
-  sender: string,
-  creditor: string,
-  conversation: Conversation,
-  messageId: string,
-  _botAddress?: string,
-): Promise<void> {
-  try {
-    // Resolve creditor identifier to address
-    const creditorAddress = await resolveCreditorAddress(creditor, conversation);
-
-    if (creditorAddress === null) {
-      const reply: Reply = {
-        reference: messageId,
-        content: `❌ Could not find member "${creditor}" in this group.\n\n` +
-          'Use basename (e.g., `@eiopago pay alice.base.eth`) or address (e.g., `@eiopago pay 0x123...`).',
-        contentType: ContentTypeText,
-      };
-      await conversation.send(reply, ContentTypeReply);
-      return;
-    }
-
-    // Find expenses where sender owes money to this creditor
-    const matchingExpenses = await findExpensesByCreditor(groupId, sender, creditorAddress);
-
-    if (matchingExpenses.length === 0) {
-      const reply: Reply = {
-        reference: messageId,
-        content: `❌ You don't owe any money to ${creditor}.\n\n` +
-          'Use `@eiopago status` to see your current debts.',
-        contentType: ContentTypeText,
-      };
-      await conversation.send(reply, ContentTypeReply);
-      return;
-    }
-
-    // Calculate total amount to pay for ALL expenses
-    console.log(`💳 Creating USDC payment request for ${matchingExpenses.length} expense(s)...`);
-
-    let totalAmountEUR = 0;
-    const expenseDetails: Array<{ id: bigint; merchant: string; amount: number }> = [];
-
-    for (const expenseId of matchingExpenses) {
-      const expense = await getExpense(expenseId);
-      if (expense === null) {
-        continue;
-      }
-
-      const amountEUR = Number(expense.perPersonAmount) / 1e18;
-      totalAmountEUR += amountEUR;
-
-      expenseDetails.push({
-        id: expenseId,
-        merchant: expense.merchant,
-        amount: amountEUR,
-      });
-    }
-
-    // Convert total amount to USDC (assuming 1:1 EUR:USDC for now)
-    const totalAmountUSDC = amountToUSDC(totalAmountEUR);
-
-    // Create USDC transfer transaction for the total amount
-    const walletSendCalls = createUSDCTransferCalls(
-      sender,
-      creditorAddress,
-      totalAmountUSDC,
-    );
-
-    console.log(`💳 Total USDC payment: ${totalAmountEUR.toFixed(2)} USDC from ${sender} to ${creditorAddress}`);
-
-    // Send transaction request
-    await conversation.send(walletSendCalls, ContentTypeWalletSendCalls);
-
-    // Build detailed message
-    let message = `💳 **Payment request created for ${expenseDetails.length} expense(s)!**\n\n`;
-    message += `👤 To: ${creditorAddress.substring(0, 6)}...${creditorAddress.substring(creditorAddress.length - 4)}\n`;
-    message += `💰 Total: ${totalAmountEUR.toFixed(2)} USDC\n\n`;
-
-    if (expenseDetails.length > 0) {
-      message += '**Expenses:**\n';
-      for (const exp of expenseDetails) {
-        message += `• #${exp.id} - ${exp.merchant}: ${exp.amount.toFixed(2)} EUR\n`;
-      }
-    }
-
-    message += '\n💡 Complete the transaction in your wallet, then send a transaction reference to confirm payment.';
-
-    // Send follow-up message as reply
-    const reply: Reply = {
-      reference: messageId,
-      content: message,
-      contentType: ContentTypeText,
-    };
-    await conversation.send(reply, ContentTypeReply);
-  } catch (error) {
-    console.error('Error handling pay command:', error);
-    const reply: Reply = {
-      reference: messageId,
-      content: `❌ Failed to create payment request: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      contentType: ContentTypeText,
-    };
-    await conversation.send(reply, ContentTypeReply);
-  }
-}
-
-/**
  * Handles the "status" command
  * Shows user's current debts, credits, and mini-app link
  */
@@ -317,7 +204,7 @@ export async function handleStatusCommand(
     // Get expenses for expense IDs
     const expenseIds = await getGroupExpenses(groupId);
     if (expenseIds.length > 0) {
-      message += '\n\n💡 Use `@eiopago paid <id>` or `@eiopago pay <id>` to settle debts.';
+      message += '\n\n💡 Use `@eiopago paid <creditor>` to settle debts.';
     }
 
     // Add mini-app link

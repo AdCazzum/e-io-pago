@@ -37,29 +37,31 @@ export function createFallbackMessage(
  * Creates a help message explaining how to use the agent
  */
 export function createHelpMessage(): string {
-  return `👋 **e io pago**
+  return `👋 **e io pago** - AI Receipt Splitter
 
-I split group expenses automatically and track them on-chain.
+I automatically analyze receipts, split expenses equally among group members, and track everything on-chain (Base Sepolia).
 
-**Commands:**
-• @eiopago help - Show this message
-• @eiopago status - Show your balance and mini-app link
-• @eiopago paid <creditor> - Mark debt as paid
-• @eiopago pay <creditor> - Pay with USDC
+**📋 Commands:**
+• \`@eiopago help\` - Show this message
+• \`@eiopago status\` - View your balance and debts
+• \`@eiopago paid <creditor>\` - Mark debts as settled
 
-**Creditor formats:**
-• Basename: "paid alice.base.eth" or "paid @alice.base.eth"
-• Address: "paid 0x123..." or "paid @0x123..."
-• Shortened: "paid 0xabc...def" or "paid @0xabc...def"
+**💡 How to use "paid":**
+Tag the creditor using their basename or wallet address:
+• \`@eiopago paid alice.base.eth\`
+• \`@eiopago paid @alice.base.eth\`
+• \`@eiopago paid 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\`
+• \`@eiopago paid @0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\`
 
-**How it works:**
-1. 📸 Send a receipt photo in the group
-2. 🔍 I analyze and calculate the split automatically
-3. ⛓️  Expense is saved on-chain (Base Sepolia)
-4. 💰 Members can pay with "@eiopago pay <id>" or mark as paid
-5. 📊 Check your balance anytime with "@eiopago status"
+**🔄 How it works:**
+1. 📸 Send a receipt photo to the group chat
+2. 🤖 I analyze it with GPT-4o Vision
+3. 💰 Calculate equal split for all members
+4. ⛓️  Save expense on-chain (I pay the gas!)
+5. 📊 Check balances with \`@eiopago status\`
+6. ✅ Settle debts with \`@eiopago paid <creditor>\`
 
-Send clear, well-lit receipt photos for best results! ✨`;
+💡 **Tip:** Send clear, well-lit photos for best results!`;
 }
 
 /**
