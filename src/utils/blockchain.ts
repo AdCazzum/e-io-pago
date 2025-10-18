@@ -114,6 +114,25 @@ export async function ensureGroupExists(
   if (!exists) {
     console.log(`📝 Group ${groupId} doesn't exist, creating...`);
     await createGroup(groupId, members, creatorPrivateKey);
+
+    // Wait and verify the group was created
+    console.log('⏳ Waiting for group creation to be confirmed...');
+    let retries = 0;
+    const maxRetries = 10;
+    while (retries < maxRetries) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 2000);
+      }); // Wait 2 seconds
+      const nowExists = await groupExists(groupId);
+      if (nowExists) {
+        console.log('✅ Group creation confirmed on-chain');
+        return;
+      }
+      retries++;
+      console.log(`   Retry ${retries}/${maxRetries}...`);
+    }
+
+    throw new Error('Group creation timed out - transaction may still be pending');
   } else {
     console.log(`✅ Group ${groupId} already exists on-chain`);
   }

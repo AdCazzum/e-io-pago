@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+const { ethers } = require("hardhat");
 
 /**
  * Deployment script for ExpenseManager contract

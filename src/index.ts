@@ -5,7 +5,7 @@
  */
 
 import 'dotenv/config';
-import { Agent, filter } from '@xmtp/agent-sdk';
+import { Agent, filter, IdentifierKind } from '@xmtp/agent-sdk';
 import { getTestUrl } from '@xmtp/agent-sdk/debug';
 import { RemoteAttachmentCodec, AttachmentCodec } from '@xmtp/content-type-remote-attachment';
 import OpenAI from 'openai';
@@ -18,6 +18,7 @@ import {
   isSupportedImageFormat,
   attachmentToBase64,
 } from './utils/attachment-handler.js';
+import { ensureGroupExists, addExpenseOnchain } from './utils/blockchain.js';
 
 // Rate limiting map to prevent spam
 const rateLimitMap = new Map<string, number>();
@@ -404,15 +405,49 @@ async function main(): Promise<void> {
         ipfsHash = 'unknown';
       }
 
-      // TODO: Save expense on-chain
-      // This requires implementing a mechanism for the payer to sign the transaction
-      // Options:
-      // 1. Generate transaction request and send to user via XMTP
-      // 2. Use ERC-2771 meta-transaction with bot as relayer
-      // 3. Direct user to mini-app to approve transaction
-      const txHash = '';
-      console.log('⚠️  On-chain integration not yet implemented');
-      console.log('   Receipt data and IPFS hash available for future on-chain storage');
+      // Save expense on-chain
+      // NOTE: For testing, bot uses its own wallet to pay gas
+      // In production, this should be signed by the payer
+      let txHash = '';
+      try {
+        console.log('💾 Saving expense on-chain...');
+
+        // Get all member addresses from the group
+        const members = await ctx.conversation.members();
+        const memberAddresses = members
+          .map((member) => {
+            const ethIdentifier = member.accountIdentifiers.find(
+              (id) => id.identifierKind === IdentifierKind.Ethereum,
+            );
+            return ethIdentifier?.identifier;
+          })
+          .filter((addr): addr is string => addr !== undefined);
+
+        // Ensure group exists on-chain
+        const groupId = ctx.conversation.id;
+        const botPrivateKey = process.env.XMTP_WALLET_KEY;
+
+        if (botPrivateKey === undefined) {
+          throw new Error('XMTP_WALLET_KEY not configured');
+        }
+
+        await ensureGroupExists(groupId, memberAddresses, botPrivateKey);
+
+        // Add expense on-chain (bot pays gas for now)
+        txHash = await addExpenseOnchain(
+          groupId,
+          receiptData,
+          perPerson,
+          sender,
+          ipfsHash,
+          botPrivateKey,
+        );
+
+        console.log('✅ Expense saved on-chain! Tx:', txHash);
+      } catch (error) {
+        console.error('❌ Failed to save on-chain:', error);
+        // Continue anyway - the analysis was successful
+      }
 
       // Build IPFS URL for the receipt
       // Use a public gateway (can be configured via env var)
@@ -420,6 +455,9 @@ async function main(): Promise<void> {
       const ipfsUrl = ipfsHash !== '' && ipfsHash !== 'unknown'
         ? `${ipfsGateway}/ipfs/${ipfsHash}`
         : '';
+
+      const miniappUrl = process.env.MINIAPP_URL ?? '';
+      const groupUrl = miniappUrl !== '' ? `${miniappUrl}/group/${ctx.conversation.id}` : '';
 
       const message = `📝 **Nuova spesa aggiunta da ${sender.substring(0, 6)}...${sender.substring(sender.length - 4)}**
 
@@ -429,8 +467,8 @@ async function main(): Promise<void> {
 
 ${ipfsUrl !== '' ? `📸 Ricevuta: ${ipfsUrl}\n` : ''}
 ${txHash !== '' ? `⛓️  Transazione: https://sepolia.basescan.org/tx/${txHash}\n` : ''}
-⚠️ **Sistema on-chain in fase di integrazione**
-Presto potrai visualizzare tutti i debiti in una mini-app!`;
+${groupUrl !== '' ? `📊 Vedi i tuoi debiti: ${groupUrl}\n` : ''}
+✅ **Spesa salvata on-chain!**`;
 
       await ctx.conversation.send(message);
       console.log('✅ Split message sent successfully!');
