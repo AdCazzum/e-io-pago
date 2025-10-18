@@ -1,30 +1,31 @@
-# XMTP Receipt Split Agent
+# E-io-Pago - XMTP Receipt Split Agent
 
-An intelligent agent running on XMTP (Base Network) that analyzes receipt images using GPT-4o Vision API and automatically calculates bill splits for group chats.
+An intelligent agent on XMTP (Base Network) that analyzes receipt images using GPT-4o Vision and automatically calculates bill splits for groups.
 
 ## 🌟 Features
 
-- **📸 Receipt Image Analysis**: Upload a receipt photo and get instant OCR analysis
+- **📸 Receipt Analysis**: Upload a receipt photo and get instant analysis
 - **🤖 GPT-4o Vision**: Advanced AI extracts items, prices, taxes, and totals
-- **💰 Automatic Bill Splitting**: Calculates equal splits for all group members
-- **💬 Natural Language Responses**: Friendly, conversational messages in English
-- **👥 Group Chat Support**: Works seamlessly in XMTP group conversations
+- **💰 Automatic Split**: Calculates equal split among all group members
+- **💬 Natural Responses**: Friendly, conversational messages
+- **👥 Group Support**: Works seamlessly in XMTP group conversations
 - **🔒 Secure & Private**: End-to-end encrypted messaging via XMTP
 - **⚡ Fast Processing**: Quick analysis and response times
-- **🌐 Base Network**: Runs on Base (Ethereum L2)
+- **🌐 Base Network**: Smart contract on Base Sepolia for on-chain management
+- **📦 IPFS Integration**: Decentralized receipt storage (managed automatically by XMTP)
 
 ## 📋 Prerequisites
 
 Before you begin, ensure you have:
 
 - **Node.js v20 or higher** - [Download here](https://nodejs.org/)
-- **npm** (comes with Node.js)
+- **npm** (included with Node.js)
 - **OpenAI Account** with API access - [Sign up here](https://platform.openai.com/)
 - **Git** (optional, for cloning)
 
-## 🚀 Quick Start
+## 🚀 Quick Start - Local Setup
 
-### 1. Clone or Download
+### 1. Clone or Download the Project
 
 ```bash
 git clone <your-repo-url>
@@ -58,7 +59,7 @@ This command will:
 - Create a `.env` file with the generated keys
 - Display your agent's wallet address
 
-**Output example:**
+**Example output:**
 ```
 ✅ Keys generated successfully!
 
@@ -75,10 +76,10 @@ Private Key: 0x...
 
 ### 4. Configure OpenAI API Key
 
-Edit the `.env` file and add your OpenAI API key:
+Open the `.env` file and add your OpenAI API key:
 
 ```env
-OPENAI_API_KEY=sk-proj-...your-actual-key...
+OPENAI_API_KEY=sk-proj-...your-key-here...
 ```
 
 **How to get an OpenAI API key:**
@@ -92,13 +93,13 @@ OPENAI_API_KEY=sk-proj-...your-actual-key...
 
 ### 5. Start the Agent
 
-#### Development Mode
+#### Development Mode (with hot-reload)
 
 ```bash
 npm run dev
 ```
 
-This starts the agent with hot-reloading using `tsx`.
+This starts the agent with automatic reloading using `tsx`.
 
 #### Production Mode
 
@@ -127,142 +128,253 @@ You should see output like:
 💡 Add this agent to a group chat and send a receipt image!
 ```
 
-Keep this terminal window open - the agent will continue running and logging activity.
+**✅ Setup complete!** Keep this terminal window open - the agent will continue running and logging activity.
 
-## 📖 Usage
+## 📱 How to Use
 
 ### Testing with XMTP Chat (Development)
 
-1. Open [xmtp.chat](https://xmtp.chat) in your browser
-2. Connect your wallet
-3. Create a new group chat or use an existing one
-4. Add the agent's address to the group
-5. Send a receipt image to the group
-6. The agent will analyze it and respond with the split calculation!
-
-### Using with Base App (Production)
-
-1. Install the [Base mobile app](https://base.org)
-2. Create or join a group chat
-3. Add the agent's address
-4. Send a receipt photo
-5. Get instant bill split calculations!
+1. **Open [xmtp.chat](https://xmtp.chat)** in your browser
+2. **Connect your wallet** (MetaMask, Coinbase Wallet, etc.)
+3. **Create a new group** or use an existing one
+4. **Add the agent to the group** using the address shown in the terminal
+5. **Send a receipt photo** with the trigger `@eiopago`
 
 ### Example Interaction
 
-**You:** *[Sends receipt image from dinner]*
-
-**Agent:**
+**In the group, type:**
 ```
-📝 Receipt Analysis Complete!
+@eiopago help
+```
 
-🏪 Joe's Pizza Restaurant
-📅 Date: 2025-01-15
+**The agent responds:**
+```
+👋 Hi! I'm your expense splitting assistant.
 
-Items:
-  • Large Pepperoni Pizza: $24.99
-  • Caesar Salad: $12.50
-  • Garlic Bread: $6.99
-  • Sodas (x3): $8.97
+📸 How it works:
+1. Upload a receipt photo to the group
+2. Tag me with @eiopago along with the image
+3. I'll analyze the receipt and calculate the split
 
-💰 Subtotal: $53.45
-🧾 Tax: $4.81
-💵 Tip: $10.00
-Total: $68.26
+💡 Available commands:
+• help - Show this message
+• [receipt photo] - Analyze and split the expense
 
-👥 Split Between 4 People:
-Each person pays: $17.07 🎯
+Ready to help! 🚀
+```
 
-Time to settle up! 💸
+**Send a receipt:**
+1. In the group, type `@eiopago`
+2. Attach a receipt photo
+3. Send
+
+**The agent analyzes and responds:**
+```
+📝 New expense added by 0x1234...5678
+
+🏪 McDonald's
+💰 Total: 24.50 EUR
+👥 Per person: 12.25 EUR (2 people)
+
+📸 Receipt: https://gateway.pinata.cloud/ipfs/QmXYZ123...
+
+⚠️ On-chain system integration in progress
+Soon you'll be able to view all debts in a mini-app!
 ```
 
 ### Available Commands
 
-- **`help`** - Shows usage instructions
-- **`hello`** / **`hi`** - Friendly greeting
-- **Send receipt image** - Analyzes and calculates split
+- **`@eiopago help`** - Show usage instructions
+- **`@eiopago` + receipt photo** - Analyze and calculate split
+- **Any message with `@eiopago`** - Conversational response with GPT-4o
 
-## ⚙️ Configuration
+**Note:** The bot works **only in groups**, not in direct messages (DMs).
 
-### Environment Variables
+## 🏗️ System Architecture
 
-Edit `.env` to configure the agent:
+### Main Components
 
-```env
-# Required: XMTP wallet private key (generated by npm run gen:keys)
-XMTP_WALLET_KEY=0x...
-
-# Required: Database encryption key (generated by npm run gen:keys)
-XMTP_DB_ENCRYPTION_KEY=abc123...
-
-# Required: Environment ('dev' for testing, 'production' for live)
-XMTP_ENV=dev
-
-# Required: OpenAI API key
-OPENAI_API_KEY=sk-proj-...
-
-# Optional: Custom database path (default: ./data/xmtp-db)
-# DB_PATH=./data/xmtp-db
+```
+┌─────────────────┐
+│  XMTP Client    │  ← User uploads receipt in group
+│  (xmtp.chat)    │
+└────────┬────────┘
+         │ RemoteAttachment with IPFS URL
+         ▼
+┌─────────────────────────────────────────┐
+│  XMTP Agent (index.ts)                  │
+│  • Event handlers (text, attachment)    │
+│  • Rate limiting                        │
+│  • Group filtering                      │
+└────────┬───────────────────────┬────────┘
+         │                       │
+         ▼                       ▼
+┌──────────────────┐    ┌──────────────────┐
+│  GPT-4o Vision   │    │  IPFS Integration│
+│  Receipt Analyze │    │  Hash Extraction │
+└──────────────────┘    └──────────────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────────────────────────────┐
+│  Smart Contract (Base Sepolia)          │
+│  • ExpenseManager.sol                   │
+│  • Multi-group support                  │
+│  • Peer-to-peer debt tracking           │
+│  • ERC2771 (gasless transactions)       │
+└────────┬────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────┐
+│  Mini-App (Next.js)                     │
+│  • Group dashboard                      │
+│  • Expense history                      │
+│  • Debt/credit visualization            │
+│  • OnchainKit + Wagmi                   │
+└─────────────────────────────────────────┘
 ```
 
-### Development vs Production
+### How IPFS Works
 
-**Development Mode (`XMTP_ENV=dev`):**
-- Uses XMTP development network
-- Test with [xmtp.chat](https://xmtp.chat)
-- No real funds needed
-- Database stored locally
+**No Pinata account needed!** 🎉
 
-**Production Mode (`XMTP_ENV=production`):**
-- Uses XMTP production network on Base
-- Real users on Base mobile app
-- Permanent message history
-- Persistent database required
+XMTP handles IPFS uploads automatically:
+
+1. **User** sends image on XMTP
+2. **XMTP Client** automatically uploads to IPFS
+3. **XMTP** sends `RemoteAttachment` with IPFS URL
+4. **Bot** downloads and decrypts for GPT-4o analysis
+5. **Bot** extracts IPFS hash from URL (`QmXYZ...`)
+6. **Bot** generates public link to gateway
+
+**No additional upload needed!** The file is already on IPFS.
+
+## ⚙️ Environment Configuration
+
+### Required Variables
+
+The `.env` file contains:
+
+```env
+# XMTP Configuration (generated by npm run gen:keys)
+XMTP_WALLET_KEY=0x...
+XMTP_DB_ENCRYPTION_KEY=abc123...
+XMTP_ENV=dev
+AGENT_TRIGGER=@eiopago
+
+# OpenAI Configuration (add manually)
+OPENAI_API_KEY=sk-proj-...
+
+# IPFS Configuration (optional, only for displaying links)
+PINATA_GATEWAY=https://gateway.pinata.cloud
+```
+
+### Optional Variables (Blockchain)
+
+If you want to test smart contract integration:
+
+```env
+# Blockchain Configuration (Base Sepolia)
+BASE_SEPOLIA_RPC=https://sepolia.base.org
+EXPENSE_CONTRACT_ADDRESS=0x...  # After deployment
+DEPLOYER_PRIVATE_KEY=0x...      # For contract deployment
+
+# BaseScan (for contract verification)
+BASESCAN_API_KEY=...
+```
+
+**Note:** Blockchain integration is currently **in development**. The bot already works for receipt analysis and expense splitting.
 
 ## 🗂️ Project Structure
 
 ```
 e-io-pago/
 ├── src/
-│   ├── index.ts                    # Main agent implementation
+│   ├── index.ts                    # Main XMTP agent
 │   ├── types.ts                    # TypeScript interfaces
 │   └── utils/
 │       ├── receipt-analyzer.ts     # GPT-4o Vision integration
-│       └── message-formatter.ts    # Natural language responses
+│       ├── message-formatter.ts    # Response formatting
+│       └── blockchain.ts           # Smart contract wrapper
+├── contracts/
+│   └── ExpenseManager.sol          # Solidity smart contract
 ├── scripts/
-│   └── generate-keys.ts            # Key generation utility
-├── docs/
-│   └── XMTP_RECEIPT_AGENT_DOCUMENTATION.md
-├── data/                           # XMTP database (auto-created)
-├── dist/                           # Compiled JavaScript (auto-created)
-├── .env                            # Environment variables (not in git)
+│   ├── generate-keys.ts            # XMTP key generation
+│   └── deploy.ts                   # Smart contract deployment
+├── miniapp/                        # Next.js mini-app
+│   ├── app/                        # Pages (App Router)
+│   ├── components/                 # React components
+│   ├── lib/                        # Utilities & config
+│   └── package.json
+├── hardhat.config.cjs              # Hardhat configuration
 ├── .env.example                    # Environment template
-├── .gitignore
+├── .gitignore                      # Files to ignore in git
 ├── package.json
 ├── tsconfig.json
+├── eslint.config.js
 ├── README.md                       # This file
-└── TESTING.md                      # Testing guide
+└── TESTING.md                      # Complete testing guide
+
+# Generated files (not in git):
+├── .env                            # Environment variables (generated by gen:keys)
+├── dist/                           # Compiled JavaScript code
+├── node_modules/                   # npm dependencies
+└── xmtp-dev-*.db3                  # Local XMTP database
 ```
 
 ## 🧪 Testing
 
-See [TESTING.md](TESTING.md) for comprehensive testing instructions including:
-- Local testing procedures
-- Test cases to verify
-- Different client testing
-- Troubleshooting guide
+### Quick Bot Test
 
-Quick test checklist:
-- ✅ Agent starts without errors
-- ✅ Responds to "help" command
-- ✅ Processes receipt images (JPEG/PNG)
-- ✅ Calculates splits correctly
-- ✅ Works in group chats
-- ✅ Handles errors gracefully
+```bash
+# 1. Make sure the bot is running
+npm run dev
+
+# 2. Open xmtp.chat
+# 3. Create group and add the bot
+# 4. Send: @eiopago help
+# 5. Upload a receipt photo with @eiopago
+```
+
+### Smart Contract Test (Optional)
+
+```bash
+# 1. Add DEPLOYER_PRIVATE_KEY to .env (with ETH on Base Sepolia)
+# 2. Compile the contract
+npm run compile
+
+# 3. Deploy to Base Sepolia
+npm run deploy
+
+# 4. Copy contract address to .env
+# EXPENSE_CONTRACT_ADDRESS=0x...
+
+# 5. Verify on BaseScan (optional)
+npm run verify
+```
+
+### Mini-App Test (Optional)
+
+```bash
+cd miniapp
+
+# 1. Install dependencies
+npm install
+
+# 2. Configure .env.local
+cp .env.example .env.local
+# Add: EXPENSE_CONTRACT_ADDRESS, CDP_API_KEY
+
+# 3. Start dev server
+npm run dev
+
+# 4. Open http://localhost:3000
+```
+
+**Complete guide:** See [TESTING.md](TESTING.md) for detailed instructions.
 
 ## 🚢 Deployment
 
-### Railway (Recommended)
+### Railway (Recommended for Bot)
 
 1. Push code to GitHub
 2. Go to [railway.app](https://railway.app)
@@ -276,30 +388,43 @@ Quick test checklist:
 6. Configure persistent volume for `/data`
 7. Deploy!
 
-See `railway.json` for configuration details.
+### Vercel (Recommended for Mini-App)
 
-### Other Platforms
+```bash
+cd miniapp
+npm install -g vercel
+vercel
+```
 
-The agent can also run on:
-- **Vercel** - Serverless functions
-- **Heroku** - Traditional PaaS
-- **Docker** - Containerized deployment
-- **VPS** - Direct server hosting
+Configure environment variables in Vercel dashboard:
+- `NEXT_PUBLIC_BASE_SEPOLIA_RPC`
+- `NEXT_PUBLIC_EXPENSE_CONTRACT_ADDRESS`
+- `NEXT_PUBLIC_CDP_API_KEY`
 
-**Important for all deployments:**
-- Set `XMTP_ENV=production`
-- Configure persistent storage for database
-- Keep environment variables secure
-- Monitor logs for errors
+## 💰 Costs
+
+### OpenAI API
+
+- **GPT-4o Vision**: ~$0.01 per receipt analysis
+- **GPT-4o Text**: ~$0.001 per conversational response
+- **Estimated total cost**: ~$0.02 per receipt processed
+
+See [OpenAI Pricing](https://openai.com/pricing) for current rates.
+
+### XMTP & Base Network
+
+- **XMTP**: Free, no messaging fees
+- **Base Network**: Gas fees only for on-chain transactions (not for messages)
+- **IPFS**: Free via XMTP (managed automatically)
 
 ## 🔒 Security
 
 ### Best Practices
 
-1. **Never commit `.env` file** - Contains private keys
+1. **Never commit `.env`** - Contains private keys
 2. **Keep wallet private key secure** - Has signing authority
 3. **Rotate OpenAI API key** if compromised
-4. **Use production mode** for real users
+4. **Use `production` mode** for real users
 5. **Monitor API usage** - OpenAI charges per request
 6. **Backup database** - Contains conversation history
 
@@ -307,60 +432,48 @@ The agent can also run on:
 
 The agent includes built-in rate limiting:
 - 5 second cooldown between requests per user
-- 10MB max image size
 - Prevents spam and abuse
-
-## 💰 Costs
-
-### OpenAI API Pricing
-
-- **GPT-4o Vision**: ~$0.01 per receipt analysis
-- **GPT-4o Text**: ~$0.001 per response generation
-- Estimated cost: **~$0.02 per receipt** processed
-
-See [OpenAI Pricing](https://openai.com/pricing) for current rates.
-
-### XMTP
-
-- **Free to use** - No messaging fees
-- Base Network gas fees not required for message sending
-- Optional: Fund wallet for on-chain operations
 
 ## 🛠️ Development
 
-### Type Checking
+### Available Commands
 
 ```bash
-npm run type-check
-```
+# Development
+npm run dev              # Start with hot-reload
+npm run build            # Compile TypeScript
+npm start               # Start compiled code
 
-### Build Only
+# Testing
+npm run type-check      # Verify TypeScript types
+npm run lint            # ESLint
+npm run lint:fix        # Auto-fix linting
 
-```bash
-npm run build
-```
+# Blockchain
+npm run compile         # Compile smart contract
+npm run deploy          # Deploy to Base Sepolia
+npm run verify          # Verify on BaseScan
 
-### Development with Watch Mode
-
-```bash
-npm run dev
+# Setup
+npm run gen:keys        # Generate XMTP keys
 ```
 
 ### Debugging
 
-Enable verbose logging by checking console output. All operations are logged:
-- Message received
-- Receipt processing status
-- API calls
-- Errors
+All logs are visible in the terminal:
+- ✅ Messages received
+- 📎 Attachments processed
+- 🤖 GPT-4o calls
+- ⚠️ Errors and warnings
 
 ## 📚 Documentation
 
-- **[TESTING.md](TESTING.md)** - Complete testing guide
-- **[docs/XMTP_RECEIPT_AGENT_DOCUMENTATION.md](docs/XMTP_RECEIPT_AGENT_DOCUMENTATION.md)** - Full technical documentation
+- **[TESTING.md](TESTING.md)** - Complete local testing guide
 - **[XMTP Docs](https://docs.xmtp.org)** - Official XMTP documentation
+- **[XMTP Agent SDK](https://github.com/xmtp/xmtp-agent-sdk)** - SDK and agent examples
 - **[OpenAI Vision API](https://platform.openai.com/docs/guides/vision)** - GPT-4o Vision guide
-- **[Base Network](https://docs.base.org)** - Base documentation
+- **[Base Network](https://docs.base.org)** - Base documentation and deployment
+- **[Hardhat](https://hardhat.org/docs)** - Smart contract framework
 
 ## ❓ Troubleshooting
 
@@ -372,7 +485,7 @@ Enable verbose logging by checking console output. All operations are logged:
 
 **Error: XMTP connection failed**
 - Check your internet connection
-- Verify `XMTP_WALLET_KEY` is correctly set
+- Verify `XMTP_WALLET_KEY` is set correctly
 - Try regenerating keys with `npm run gen:keys`
 
 ### Receipt not processing
@@ -380,33 +493,60 @@ Enable verbose logging by checking console output. All operations are logged:
 **"I'm having trouble reading this receipt"**
 - Ensure image is clear and well-lit
 - Check image is JPEG or PNG format
-- Verify image size is under 10MB
+- Verify it's actually a receipt (GPT-4o rejects other images)
 - Make sure total and items are visible
 
 **"Processing error"**
 - Check OpenAI API key is valid
 - Verify you have OpenAI credits
 - Check internet connection
-- View console logs for detailed error
+- View terminal logs for details
 
-### Group chat issues
+### Agent not responding in group
 
-**Agent not responding in group**
 - Verify agent address is correct
 - Make sure agent is added as group member
 - Check agent is running (terminal shows activity)
-- Try sending "help" command first
+- Use trigger word `@eiopago` at the beginning of message
+- Try `@eiopago help` command first
 
-### Database issues
+### Database errors
 
-**"Database locked" error**
-- Only run one instance of the agent
-- Check database path permissions
+**"Database locked"**
+- Run only one agent instance at a time
+- Check database folder permissions
 - Restart the agent
+
+## 🗺️ Roadmap
+
+### ✅ Completed
+
+- [x] Receipt analysis with GPT-4o Vision
+- [x] Automatic equal split
+- [x] XMTP group support
+- [x] IPFS integration (managed by XMTP)
+- [x] ExpenseManager smart contract
+- [x] Next.js mini-app
+- [x] ERC2771 support (gasless transactions)
+
+### 🚧 In Development
+
+- [ ] On-chain integration in bot (requires user signature)
+- [ ] Gasless transactions with Base Paymaster
+- [ ] "Mark as Paid" system in mini-app
+
+### 🔮 Future Features
+
+- [ ] Custom split ratios (not just equal)
+- [ ] Multi-currency support
+- [ ] Expense history per group
+- [ ] Debt notifications
+- [ ] Payment app integration
+- [ ] CSV/PDF export
 
 ## 🤝 Contributing
 
-Contributions welcome! Please:
+Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
@@ -423,25 +563,14 @@ MIT License - See LICENSE file for details
 - **OpenAI** - GPT-4o Vision API
 - **Base** - Ethereum L2 network
 - **Coinbase** - Base Network support
+- **Pinata** - Public IPFS gateway
 
 ## 📞 Support
 
 - **Issues**: Open a GitHub issue
-- **XMTP Discord**: Join for community support
-- **Documentation**: Check docs/ folder
-
-## 🗺️ Roadmap
-
-Future enhancements:
-- [ ] Custom split ratios (not just equal splits)
-- [ ] Multi-currency support
-- [ ] Receipt history tracking
-- [ ] Payment link generation
-- [ ] Support for itemized per-person splits
-- [ ] Integration with payment apps
+- **XMTP Discord**: [Join the community](https://discord.gg/xmtp) for support
+- **Documentation**: See [TESTING.md](TESTING.md) for complete guide
 
 ---
 
-**Built with ❤️ using XMTP, GPT-4o, and Base Network**
-
-For detailed technical documentation, see [docs/XMTP_RECEIPT_AGENT_DOCUMENTATION.md](docs/XMTP_RECEIPT_AGENT_DOCUMENTATION.md)
+**Built with ❤️ using XMTP, GPT-4o, Base Network and IPFS**
