@@ -7,8 +7,20 @@ import '@coinbase/onchainkit/styles.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'E-io-Pago | Group Expense Tracking',
-  description: 'Track and split expenses on-chain with your group',
+  title: 'e io pago',
+  description: 'Split receipts with your XMTP group on Base',
+  openGraph: {
+    title: 'e io pago',
+    description: 'Split receipts with your XMTP group on Base',
+    images: ['/frame'],
+  },
+  other: {
+    'fc:frame': 'vNext',
+    'fc:frame:image': `${process.env.NEXT_PUBLIC_URL ?? 'http://localhost:3000'}/frame`,
+    'fc:frame:button:1': 'Open App',
+    'fc:frame:button:1:action': 'link',
+    'fc:frame:button:1:target': process.env.NEXT_PUBLIC_URL ?? 'http://localhost:3000',
+  },
 }
 
 export default function RootLayout({

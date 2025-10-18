@@ -115,12 +115,30 @@ async function main(): Promise<void> {
   });
 
   // Handle agent startup
-  agent.on('start', () => {
+  agent.on('start', async () => {
     console.log('✅ Agent is ready and listening for messages!\n');
     console.log('📬 Agent Address:', agent.address);
     console.log('🔗 Test URL:', getTestUrl(agent.client));
     console.log('🌐 Environment:', process.env.XMTP_ENV ?? 'dev');
     console.log('\n💡 Add this agent to a group chat and send a receipt image!\n');
+
+    // Auto-activate on XMTP network by syncing conversations
+    // This ensures the bot is registered and can be added to groups immediately
+    try {
+      console.log('🔄 Activating bot on XMTP network...');
+
+      // Sync all conversations to register the bot on the network
+      await agent.client.conversations.sync();
+
+      // Get all conversations (this triggers network registration)
+      const conversations = await agent.client.conversations.list();
+
+      console.log('✅ Bot successfully activated on XMTP network');
+      console.log(`   Found ${conversations.length} existing conversation(s)\n`);
+    } catch (error) {
+      console.log('⚠️  Auto-activation warning:', error);
+      console.log('   The bot should still work normally.\n');
+    }
   });
 
   // Handle text messages
@@ -153,9 +171,9 @@ async function main(): Promise<void> {
     if (isDm) {
       console.log('⏭️  DM received - informing user to use in groups');
       await ctx.conversation.send(
-        `👋 Hi! I'm a group expense splitting agent.\n\n` +
-        `Please add me to a group chat and tag me with "${triggerWord}" to use me.\n\n` +
-        `Example: ${triggerWord} help`,
+        '👋 Hi! I split group expenses.\n\n' +
+        `Add me to a group and send "${triggerWord} status" to see your debts and credits.\n\n` +
+        `For help: ${triggerWord} help`,
       );
       return;
     }
@@ -191,6 +209,37 @@ async function main(): Promise<void> {
     if (processedLower === 'help' || processedLower === '/help' || processedLower === '?') {
       const helpMsg = createHelpMessage();
       await ctx.conversation.send(helpMsg);
+      return;
+    }
+
+    // Status command - share mini-app link with group ID
+    if (processedLower === 'status' || processedLower === 'stato') {
+      const baseUrl = process.env.MINIAPP_URL ?? 'http://localhost:3000';
+
+      // Get group ID (conversation.id for groups)
+      // Type assertion needed because the SDK types don't include 'id' property
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const conversation = ctx.conversation as any;
+
+      if (isGroup && conversation.id !== undefined) {
+        // For groups, append the group ID to the URL
+        const groupId = conversation.id as string;
+        const groupUrl = `${baseUrl}/group/${groupId}`;
+
+        console.log(`📱 Sending group status link: ${groupUrl}`);
+
+        await ctx.conversation.send(
+          `📊 View your debts and credits:\n\n${groupUrl}`,
+        );
+      } else {
+        // For DMs
+        console.log(`📱 Sending base URL for DM: isGroup=${isGroup}, id=${conversation.id ?? 'undefined'}`);
+
+        await ctx.conversation.send(
+          `📊 Use this command in a group to see your debts and credits!\n\n${baseUrl}`,
+        );
+      }
+
       return;
     }
 

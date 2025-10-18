@@ -37,23 +37,21 @@ export function createFallbackMessage(
  * Creates a help message explaining how to use the agent
  */
 export function createHelpMessage(): string {
-  return `👋 **Receipt Split Agent**
+  return `👋 **e io pago**
 
-I help you split bills equally among group members!
+I split group expenses automatically.
 
-**How to use:**
-1. 📸 Send a photo of your receipt
-2. 🔍 I'll analyze it and extract all items
-3. 💰 I'll calculate the split for everyone in the group
-4. ✅ Everyone pays their equal share!
+**Commands:**
+• @eiopago status - View your debts and credits
+• @eiopago help - Show this message
 
-**Tips:**
-• Make sure the receipt image is clear and well-lit
-• The total and items should be visible
-• I support JPEG and PNG images
-• Works best in group chats!
+**How it works:**
+1. 📸 Send a receipt photo
+2. 🔍 I analyze and calculate the split
+3. 💰 Everyone pays their share
+4. 📊 Use "status" to see your summary
 
-Send "help" anytime to see this message again. 🤖`;
+Send clear, well-lit receipt photos for best results! ✨`;
 }
 
 /**
