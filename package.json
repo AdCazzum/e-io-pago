@@ -28,12 +28,16 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@coinbase/onchainkit": "^1.1.1",
     "@xmtp/agent-sdk": "latest",
     "@xmtp/content-type-primitives": "^2.0.2",
     "@xmtp/content-type-remote-attachment": "latest",
     "@xmtp/content-type-reply": "^2.0.2",
+    "@xmtp/content-type-transaction-reference": "^2.0.2",
+    "@xmtp/content-type-wallet-send-calls": "^2.0.0",
     "dotenv": "^16.4.5",
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "viem": "^2.38.3"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^3.1.0",

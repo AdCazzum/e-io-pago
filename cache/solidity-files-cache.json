@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/lorenzofiore/Progetti/Personale/e-io-pago/contracts/ExpenseManager.sol": {
-      "lastModificationDate": 1760804905371,
-      "contentHash": "65e81d72407a0f3887c7ff9a58f4ba35",
+      "lastModificationDate": 1760819584989,
+      "contentHash": "32dc38704bf2e4909805d354026f2e58",
       "sourceName": "contracts/ExpenseManager.sol",
       "solcConfig": {
         "version": "0.8.27",

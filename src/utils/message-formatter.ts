@@ -39,17 +39,25 @@ export function createFallbackMessage(
 export function createHelpMessage(): string {
   return `👋 **e io pago**
 
-I split group expenses automatically.
+I split group expenses automatically and track them on-chain.
 
 **Commands:**
-• @eiopago status - View your debts and credits
 • @eiopago help - Show this message
+• @eiopago status - Show your balance and mini-app link
+• @eiopago paid <creditor> - Mark debt as paid
+• @eiopago pay <creditor> - Pay with USDC
+
+**Creditor formats:**
+• Basename: "paid alice.base.eth" or "paid @alice.base.eth"
+• Address: "paid 0x123..." or "paid @0x123..."
+• Shortened: "paid 0xabc...def" or "paid @0xabc...def"
 
 **How it works:**
-1. 📸 Send a receipt photo
-2. 🔍 I analyze and calculate the split
-3. 💰 Everyone pays their share
-4. 📊 Use "status" to see your summary
+1. 📸 Send a receipt photo in the group
+2. 🔍 I analyze and calculate the split automatically
+3. ⛓️  Expense is saved on-chain (Base Sepolia)
+4. 💰 Members can pay with "@eiopago pay <id>" or mark as paid
+5. 📊 Check your balance anytime with "@eiopago status"
 
 Send clear, well-lit receipt photos for best results! ✨`;
 }

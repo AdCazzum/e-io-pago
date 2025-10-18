@@ -144,7 +144,7 @@ contract ExpenseManager is ERC2771Context, ReentrancyGuard {
     ) external {
         require(!groups[groupId].exists, "Group already exists");
         require(members.length > 0, "Group must have at least one member");
-        require(isMemberInArray(members, _msgSender()), "Creator must be a member");
+        // Note: Creator doesn't need to be a member (allows bot to create groups)
 
         groups[groupId] = Group({
             groupId: groupId,
@@ -202,7 +202,8 @@ contract ExpenseManager is ERC2771Context, ReentrancyGuard {
         string memory currency,
         string memory ipfsHash,
         string memory metadata
-    ) external onlyGroupMember(groupId) nonReentrant {
+    ) external nonReentrant {
+        require(groups[groupId].exists, "Group does not exist");
         require(totalAmount > 0, "Total amount must be greater than 0");
         require(perPersonAmount > 0, "Per person amount must be greater than 0");
         require(bytes(merchant).length > 0, "Merchant name required");
@@ -297,6 +298,84 @@ contract ExpenseManager is ERC2771Context, ReentrancyGuard {
         });
 
         emit PaymentMarked(paymentId, expenseId, debtor, creditor, amountPaid, isGasless, block.timestamp);
+        emit DebtUpdated(groupId, debtor, creditor, debts[groupId][debtor][creditor]);
+    }
+
+    /**
+     * @notice Marks multiple expenses as paid in a single transaction (batch)
+     * @param expenseIds Array of expense IDs to mark as paid
+     * @param debtor The address of the person whose debts are being marked as paid
+     * @param creditor The creditor address (must be the same for all expenses)
+     */
+    function batchMarkAsPaid(
+        uint256[] calldata expenseIds,
+        address debtor,
+        address creditor
+    ) external nonReentrant {
+        require(expenseIds.length > 0, "Empty expense IDs array");
+        require(expenseIds.length <= 50, "Too many expenses (max 50)");
+        require(debtor != address(0), "Invalid debtor address");
+        require(creditor != address(0), "Invalid creditor address");
+
+        uint256 totalAmountPaid = 0;
+        string memory groupId;
+
+        // First pass: validate all expenses and calculate total
+        for (uint256 i = 0; i < expenseIds.length; i++) {
+            uint256 expenseId = expenseIds[i];
+            require(expenses[expenseId].id == expenseId, "Expense does not exist");
+
+            Expense memory expense = expenses[expenseId];
+
+            // Set groupId from first expense and validate debtor is a member
+            if (i == 0) {
+                groupId = expense.groupId;
+                require(groups[groupId].exists, "Group does not exist");
+                require(isGroupMember(groupId, debtor), "Debtor is not a group member");
+                // Note: Caller doesn't need to be a member (allows bot to execute on behalf)
+            } else {
+                // All expenses must be from the same group
+                require(
+                    keccak256(bytes(expense.groupId)) == keccak256(bytes(groupId)),
+                    "All expenses must be from the same group"
+                );
+            }
+
+            // Verify expense payer matches creditor
+            require(expense.payer == creditor, "Creditor mismatch");
+
+            totalAmountPaid += expense.perPersonAmount;
+        }
+
+        // Verify debtor has enough debt to cover all expenses
+        require(debts[groupId][debtor][creditor] >= totalAmountPaid, "Insufficient debt to creditor");
+
+        // Second pass: record payments and emit events
+        bool isGasless = _msgSender() != tx.origin;
+
+        for (uint256 i = 0; i < expenseIds.length; i++) {
+            uint256 expenseId = expenseIds[i];
+            Expense memory expense = expenses[expenseId];
+            uint256 amountPaid = expense.perPersonAmount;
+
+            // Reduce debt
+            debts[groupId][debtor][creditor] -= amountPaid;
+
+            // Record payment
+            uint256 paymentId = paymentCounter++;
+            payments[paymentId] = Payment({
+                expenseId: expenseId,
+                from: debtor,
+                to: creditor,
+                amount: amountPaid,
+                timestamp: block.timestamp,
+                gasless: isGasless
+            });
+
+            emit PaymentMarked(paymentId, expenseId, debtor, creditor, amountPaid, isGasless, block.timestamp);
+        }
+
+        // Emit final debt update
         emit DebtUpdated(groupId, debtor, creditor, debts[groupId][debtor][creditor]);
     }
 

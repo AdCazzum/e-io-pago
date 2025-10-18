@@ -7,8 +7,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint": "eslint . --ignore-pattern '.next'",
+    "lint:fix": "eslint . --fix --ignore-pattern '.next'"
   },
   "dependencies": {
     "@coinbase/onchainkit": "^1.1.1",

@@ -59,15 +59,22 @@ export async function getUserDebtsAndCredits(
     const [debtCreditors, debtAmounts] = await contract.getUserDebts(groupId, userAddress);
     const [creditDebtors, creditAmounts] = await contract.getUserCredits(groupId, userAddress);
 
-    const debts: DebtInfo[] = debtCreditors.map((creditor: string, i: number) => ({
-      creditor,
-      amount: debtAmounts[i],
-    }));
+    // Filter out bot address from debts/credits
+    const botAddress = process.env.NEXT_PUBLIC_BOT_ADDRESS?.toLowerCase();
 
-    const credits: CreditInfo[] = creditDebtors.map((debtor: string, i: number) => ({
-      debtor,
-      amount: creditAmounts[i],
-    }));
+    const debts: DebtInfo[] = debtCreditors
+      .map((creditor: string, i: number) => ({
+        creditor,
+        amount: debtAmounts[i],
+      }))
+      .filter((debt: DebtInfo) => botAddress === undefined || debt.creditor.toLowerCase() !== botAddress);
+
+    const credits: CreditInfo[] = creditDebtors
+      .map((debtor: string, i: number) => ({
+        debtor,
+        amount: creditAmounts[i],
+      }))
+      .filter((credit: CreditInfo) => botAddress === undefined || credit.debtor.toLowerCase() !== botAddress);
 
     const totalDebts = debts.reduce((sum, d) => sum + d.amount, 0n);
     const totalCredits = credits.reduce((sum, c) => sum + c.amount, 0n);

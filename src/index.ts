@@ -5,11 +5,20 @@
  */
 
 import 'dotenv/config';
-import { Agent, filter, IdentifierKind } from '@xmtp/agent-sdk';
+import { Agent, filter, IdentifierKind, type AgentMiddleware } from '@xmtp/agent-sdk';
 import { getTestUrl } from '@xmtp/agent-sdk/debug';
 import { RemoteAttachmentCodec, AttachmentCodec } from '@xmtp/content-type-remote-attachment';
 import { ContentTypeReply, ReplyCodec, type Reply } from '@xmtp/content-type-reply';
 import { ContentTypeText } from '@xmtp/content-type-text';
+import {
+  TransactionReferenceCodec,
+  type TransactionReference,
+} from '@xmtp/content-type-transaction-reference';
+import {
+  ContentTypeWalletSendCalls,
+  WalletSendCallsCodec,
+} from '@xmtp/content-type-wallet-send-calls';
+import { ethers } from 'ethers';
 import OpenAI from 'openai';
 
 import { analyzeReceipt, calculateSplit } from './utils/receipt-analyzer.js';
@@ -21,6 +30,7 @@ import {
   attachmentToBase64,
 } from './utils/attachment-handler.js';
 import { ensureGroupExists, addExpenseOnchain } from './utils/blockchain.js';
+import { handlePaidCommand, handlePayCommand, handleStatusCommand } from './utils/payment-handler.js';
 
 // Rate limiting map to prevent spam
 const rateLimitMap = new Map<string, number>();
@@ -111,11 +121,42 @@ async function main(): Promise<void> {
   // Shutdown flag to prevent processing during shutdown
   let isShuttingDown = false;
 
-  // Create XMTP agent with attachment and reply codecs
+  // Transaction reference middleware - handles confirmed USDC payments
+  const transactionReferenceMiddleware: AgentMiddleware = async (ctx, next) => {
+    // Check if this is a transaction reference message
+    if (ctx.usesCodec(TransactionReferenceCodec)) {
+      const transactionRef = ctx.message.content as TransactionReference;
+      console.log('✅ Received transaction reference:', transactionRef);
+
+      await ctx.conversation.send(
+        `✅ Payment transaction confirmed!\n\n` +
+        `🔗 Network: ${transactionRef.networkId}\n` +
+        `📄 [View on BaseScan](https://sepolia.basescan.org/tx/${transactionRef.reference})\n\n` +
+        `Your debt has been marked as paid on-chain.`,
+      );
+
+      // Don't continue to other handlers
+      return;
+    }
+
+    // Continue to next middleware/handler
+    await next();
+  };
+
+  // Create XMTP agent with all codecs
   const agent = await Agent.createFromEnv({
-    codecs: [new RemoteAttachmentCodec(), new AttachmentCodec(), new ReplyCodec()],
+    codecs: [
+      new RemoteAttachmentCodec(),
+      new AttachmentCodec(),
+      new ReplyCodec(),
+      new WalletSendCallsCodec(),
+      new TransactionReferenceCodec(),
+    ],
     env: (process.env.XMTP_ENV ?? 'dev') as 'dev' | 'production',
   });
+
+  // Apply transaction middleware
+  agent.use(transactionReferenceMiddleware);
 
   // Handle agent startup
   agent.on('start', async () => {
@@ -215,7 +256,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Status command - share mini-app link with group ID
+    // Status command - show balance and mini-app link
     if (processedLower === 'status' || processedLower === 'stato') {
       const baseUrl = process.env.MINIAPP_URL ?? 'http://localhost:3000';
 
@@ -225,24 +266,75 @@ async function main(): Promise<void> {
       const conversation = ctx.conversation as any;
 
       if (isGroup && conversation.id !== undefined) {
-        // For groups, append the group ID to the URL
+        // For groups, show balance info and mini-app link
         const groupId = conversation.id as string;
-        const groupUrl = `${baseUrl}/group/${groupId}`;
 
-        console.log(`📱 Sending group status link: ${groupUrl}`);
+        console.log(`📊 Sending status for group ${groupId}`);
 
-        await ctx.conversation.send(
-          `📊 View your debts and credits:\n\n${groupUrl}`,
-        );
+        await handleStatusCommand(groupId, sender, ctx.conversation, ctx.message.id, agent.address, baseUrl);
       } else {
         // For DMs
         console.log(`📱 Sending base URL for DM: isGroup=${isGroup}, id=${conversation.id ?? 'undefined'}`);
 
-        await ctx.conversation.send(
-          `📊 Use this command in a group to see your debts and credits!\n\n${baseUrl}`,
-        );
+        const reply: Reply = {
+          reference: ctx.message.id,
+          content: `📊 Use this command in a group to see your debts and credits!\n\n${baseUrl}`,
+          contentType: ContentTypeText,
+        };
+
+        await ctx.conversation.send(reply, ContentTypeReply);
       }
 
+      return;
+    }
+
+    // Paid command - mark debt as paid (manual payment)
+    if (processedLower.startsWith('paid ') || processedLower.startsWith('pagato ')) {
+      const parts = processedLower.split(' ');
+      if (parts.length < 2) {
+        await ctx.conversation.send(
+          '❌ Usage: `@eiopago paid <creditor>`\n\n' +
+          'Tag the creditor using basename or address:\n' +
+          '• `@eiopago paid alice.base.eth`\n' +
+          '• `@eiopago paid @alice.base.eth`\n' +
+          '• `@eiopago paid 0x123...`\n' +
+          '• `@eiopago paid @0x123...`',
+        );
+        return;
+      }
+
+      const identifier = parts.slice(1).join(' '); // Support names with spaces
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const conversation = ctx.conversation as any;
+      const groupId = conversation.id as string;
+      const botPrivateKey = process.env.XMTP_WALLET_KEY ?? '';
+
+      await handlePaidCommand(groupId, sender, identifier, ctx.conversation, ctx.message.id, botPrivateKey, agent.address);
+      return;
+    }
+
+    // Pay command - create USDC payment transaction
+    if (processedLower.startsWith('pay ') || processedLower.startsWith('paga ')) {
+      const parts = processedLower.split(' ');
+      if (parts.length < 2) {
+        await ctx.conversation.send(
+          '❌ Usage: `@eiopago pay <creditor>`\n\n' +
+          'Tag the creditor using basename or address:\n' +
+          '• `@eiopago pay alice.base.eth`\n' +
+          '• `@eiopago pay @alice.base.eth`\n' +
+          '• `@eiopago pay 0x123...`\n' +
+          '• `@eiopago pay @0x123...`\n\n' +
+          '💡 This will create a USDC payment transaction.',
+        );
+        return;
+      }
+
+      const identifier = parts.slice(1).join(' '); // Support names with spaces
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const conversation = ctx.conversation as any;
+      const groupId = conversation.id as string;
+
+      await handlePayCommand(groupId, sender, identifier, ctx.conversation, ctx.message.id, agent.address);
       return;
     }
 
@@ -430,8 +522,15 @@ async function main(): Promise<void> {
       try {
         console.log('💾 Saving expense on-chain...');
 
-        // Get all member addresses from the group
+        // Get all member addresses from the group (excluding the bot)
         const members = await ctx.conversation.members();
+        const botAddress = agent.address?.toLowerCase();
+
+        if (botAddress === undefined) {
+          throw new Error('Bot address is undefined - cannot process expense');
+        }
+
+        // Get all addresses EXCEPT bot (bot should never be a group member)
         const memberAddresses = members
           .map((member) => {
             const ethIdentifier = member.accountIdentifiers.find(
@@ -439,9 +538,10 @@ async function main(): Promise<void> {
             );
             return ethIdentifier?.identifier;
           })
-          .filter((addr): addr is string => addr !== undefined);
+          .filter((addr): addr is string => addr !== undefined)
+          .filter((addr) => addr.toLowerCase() !== botAddress);
 
-        // Ensure group exists on-chain
+        // Ensure group exists on-chain (bot can create group without being a member)
         const groupId = ctx.conversation.id;
         const botPrivateKey = process.env.XMTP_WALLET_KEY;
 
@@ -486,7 +586,9 @@ async function main(): Promise<void> {
 ${ipfsUrl !== '' ? `📸 [View receipt](${ipfsUrl})\n` : ''}
 ${txHash !== '' ? `⛓️  [View transaction](https://sepolia.basescan.org/tx/${txHash})\n` : ''}
 ${groupUrl !== '' ? `📊 [Check your debts](${groupUrl})\n` : ''}
-✅ **Expense saved on-chain!**`;
+✅ **Expense saved on-chain!**
+
+💡 Use \`@eiopago status\` to see your balance or \`@eiopago pay <id>\` to pay with USDC.`;
 
       // Reply to the analyzing message with the result
       const resultReply: Reply = {

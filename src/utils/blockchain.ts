@@ -209,6 +209,81 @@ export async function addExpenseOnchain(
 }
 
 /**
+ * Marks a debt as paid on-chain
+ * @param expenseId The expense ID
+ * @param creditor The creditor address
+ * @param debtorPrivateKey Private key of the debtor paying
+ * @returns Transaction hash
+ */
+export async function markDebtAsPaid(
+  expenseId: bigint,
+  creditor: string,
+  debtorPrivateKey: string,
+): Promise<string> {
+  try {
+    console.log('💸 Marking debt as paid on-chain...');
+    console.log(`   Expense ID: ${expenseId}`);
+    console.log(`   Creditor: ${creditor}`);
+
+    const contract = getContractWithSigner(debtorPrivateKey);
+
+    const tx = await contract.markAsPaid(expenseId, creditor);
+    console.log(`   Transaction hash: ${tx.hash}`);
+
+    const receipt = await tx.wait();
+    console.log('✅ Debt marked as paid on-chain!');
+    console.log(`   Block: ${receipt.blockNumber}`);
+    console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+
+    return tx.hash as string;
+  } catch (error) {
+    console.error('❌ Error marking debt as paid:', error);
+    throw new Error(
+      `Failed to mark debt as paid: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
+ * Marks multiple debts as paid in a single transaction (batch)
+ * @param expenseIds Array of expense IDs to mark as paid
+ * @param debtor The address of the person whose debts are being marked as paid
+ * @param creditor The creditor's address (must be the same for all expenses)
+ * @param botPrivateKey Private key of the bot (pays gas)
+ * @returns Transaction hash
+ */
+export async function batchMarkDebtsAsPaid(
+  expenseIds: bigint[],
+  debtor: string,
+  creditor: string,
+  botPrivateKey: string,
+): Promise<string> {
+  try {
+    console.log(`💸 Marking ${expenseIds.length} debts as paid (batch)...`);
+    console.log(`   Expense IDs: [${expenseIds.join(', ')}]`);
+    console.log(`   Debtor: ${debtor}`);
+    console.log(`   Creditor: ${creditor}`);
+
+    const contract = getContractWithSigner(botPrivateKey);
+
+    const tx = await contract.batchMarkAsPaid(expenseIds, debtor, creditor);
+    console.log(`   Transaction hash: ${tx.hash}`);
+
+    const receipt = await tx.wait();
+    console.log('✅ Debts marked as paid on-chain (batch)!');
+    console.log(`   Block: ${receipt.blockNumber}`);
+    console.log(`   Gas used: ${receipt.gasUsed.toString()}`);
+
+    return tx.hash as string;
+  } catch (error) {
+    console.error('❌ Error marking debts as paid (batch):', error);
+    throw new Error(
+      `Failed to mark debts as paid (batch): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
  * Gets all expenses for a group
  * @param groupId XMTP conversation ID
  * @returns Array of expense IDs
@@ -233,6 +308,7 @@ export async function getGroupExpenses(groupId: string): Promise<bigint[]> {
 export async function getUserBalanceInfo(
   groupId: string,
   userAddress: string,
+  botAddress?: string,
 ): Promise<{
   debts: Array<{ creditor: string; amount: bigint }>;
   credits: Array<{ debtor: string; amount: bigint }>;
@@ -247,10 +323,15 @@ export async function getUserBalanceInfo(
       userAddress,
     )) as [string[], bigint[]];
 
-    const debts = debtCreditors.map((creditor, index) => ({
-      creditor,
-      amount: debtAmounts[index] ?? 0n,
-    }));
+    // Filter out bot address if provided
+    const botAddressLower = botAddress?.toLowerCase();
+
+    const debts = debtCreditors
+      .map((creditor, index) => ({
+        creditor,
+        amount: debtAmounts[index] ?? 0n,
+      }))
+      .filter((debt) => botAddressLower === undefined || debt.creditor.toLowerCase() !== botAddressLower);
 
     // Get what others owe to user
     const [creditDebtors, creditAmounts] = (await contract.getUserCredits(
@@ -258,10 +339,12 @@ export async function getUserBalanceInfo(
       userAddress,
     )) as [string[], bigint[]];
 
-    const credits = creditDebtors.map((debtor, index) => ({
-      debtor,
-      amount: creditAmounts[index] ?? 0n,
-    }));
+    const credits = creditDebtors
+      .map((debtor, index) => ({
+        debtor,
+        amount: creditAmounts[index] ?? 0n,
+      }))
+      .filter((credit) => botAddressLower === undefined || credit.debtor.toLowerCase() !== botAddressLower);
 
     // Calculate net balance (credits - debts)
     const totalDebts = debts.reduce((sum, debt) => sum + debt.amount, 0n);
@@ -280,6 +363,114 @@ export async function getUserBalanceInfo(
       credits: [],
       netBalance: 0n,
     };
+  }
+}
+
+/**
+ * Gets the total debt amount between debtor and creditor
+ * @param groupId XMTP conversation ID
+ * @param debtorAddress Debtor's Ethereum address
+ * @param creditorAddress Creditor's Ethereum address
+ * @returns Total debt amount in wei
+ */
+export async function getDebtAmount(
+  groupId: string,
+  debtorAddress: string,
+  creditorAddress: string,
+): Promise<bigint> {
+  try {
+    const contract = getContract();
+    const debt = (await contract.getDebt(groupId, debtorAddress, creditorAddress)) as bigint;
+    return debt;
+  } catch (error) {
+    console.error('Error getting debt amount:', error);
+    return 0n;
+  }
+}
+
+/**
+ * Finds unpaid expenses where debtor owes money to creditor
+ * @param groupId XMTP conversation ID
+ * @param debtorAddress Debtor's Ethereum address
+ * @param creditorAddress Creditor's Ethereum address
+ * @returns Array of expense IDs where debtor is a participant and payer is the creditor
+ */
+export async function findExpensesByCreditor(
+  groupId: string,
+  debtorAddress: string,
+  creditorAddress: string,
+): Promise<bigint[]> {
+  try {
+    // Get all expenses for the group
+    const expenseIds = await getGroupExpenses(groupId);
+
+    const matchingExpenses: bigint[] = [];
+
+    for (const expenseId of expenseIds) {
+      const expense = await getExpense(expenseId);
+      if (expense === null) {
+        continue;
+      }
+
+      // Check if this expense was paid by the creditor
+      if (expense.payer.toLowerCase() !== creditorAddress.toLowerCase()) {
+        continue;
+      }
+
+      // Check if debtor is a participant in this expense
+      const isParticipant = expense.participants.some(
+        (p) => p.toLowerCase() === debtorAddress.toLowerCase(),
+      );
+
+      if (isParticipant) {
+        matchingExpenses.push(expenseId);
+      }
+    }
+
+    return matchingExpenses;
+  } catch (error) {
+    console.error('Error finding expenses by creditor:', error);
+    return [];
+  }
+}
+
+/**
+ * Gets expense details by ID
+ * @param expenseId The expense ID
+ * @returns Expense object or null
+ */
+export async function getExpense(expenseId: bigint): Promise<{
+  id: bigint;
+  groupId: string;
+  payer: string;
+  merchant: string;
+  totalAmount: bigint;
+  perPersonAmount: bigint;
+  currency: string;
+  ipfsHash: string;
+  timestamp: bigint;
+  participants: string[];
+  metadata: string;
+} | null> {
+  try {
+    const contract = getContract();
+    const expense = await contract.getExpense(expenseId);
+    return expense as {
+      id: bigint;
+      groupId: string;
+      payer: string;
+      merchant: string;
+      totalAmount: bigint;
+      perPersonAmount: bigint;
+      currency: string;
+      ipfsHash: string;
+      timestamp: bigint;
+      participants: string[];
+      metadata: string;
+    };
+  } catch (error) {
+    console.error('Error fetching expense:', error);
+    return null;
   }
 }
 
