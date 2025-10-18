@@ -13,10 +13,12 @@ import type { ReceiptData } from '../types.js';
 const EXPENSE_MANAGER_ABI = ExpenseManagerArtifact.abi;
 
 /**
- * Gets a configured ethers provider for Base Sepolia
+ * Gets a configured ethers provider
+ * Supports both local Hardhat node and Base Sepolia
  */
 function getProvider(): ethers.JsonRpcProvider {
-  const rpcUrl = process.env.BASE_SEPOLIA_RPC ?? 'https://sepolia.base.org';
+  // Use RPC_URL for generic configuration, fallback to BASE_SEPOLIA_RPC for backward compatibility
+  const rpcUrl = process.env.RPC_URL ?? process.env.BASE_SEPOLIA_RPC ?? 'https://sepolia.base.org';
   return new ethers.JsonRpcProvider(rpcUrl);
 }
 
@@ -283,7 +285,7 @@ export async function getGroupMembers(groupId: string): Promise<string[]> {
  */
 export function validateBlockchainConfig(): boolean {
   const contractAddress = process.env.EXPENSE_CONTRACT_ADDRESS;
-  const rpcUrl = process.env.BASE_SEPOLIA_RPC;
+  const rpcUrl = process.env.RPC_URL ?? process.env.BASE_SEPOLIA_RPC;
 
   if (contractAddress === undefined || contractAddress.trim().length === 0) {
     console.error('❌ EXPENSE_CONTRACT_ADDRESS is not configured');
@@ -291,7 +293,7 @@ export function validateBlockchainConfig(): boolean {
   }
 
   if (rpcUrl === undefined || rpcUrl.trim().length === 0) {
-    console.error('❌ BASE_SEPOLIA_RPC is not configured');
+    console.error('❌ RPC_URL (or BASE_SEPOLIA_RPC) is not configured');
     return false;
   }
 
@@ -303,10 +305,17 @@ export function validateBlockchainConfig(): boolean {
 }
 
 /**
- * Gets transaction receipt URL on BaseScan
+ * Gets transaction receipt URL
  * @param txHash Transaction hash
- * @returns BaseScan URL
+ * @returns Block explorer URL (BaseScan for testnet, localhost info for local)
  */
 export function getBaseScanUrl(txHash: string): string {
+  const rpcUrl = process.env.RPC_URL ?? process.env.BASE_SEPOLIA_RPC ?? 'https://sepolia.base.org';
+
+  // Check if using local node
+  if (rpcUrl.includes('localhost') || rpcUrl.includes('127.0.0.1')) {
+    return `Local transaction: ${txHash}`;
+  }
+
   return `https://sepolia.basescan.org/tx/${txHash}`;
 }
