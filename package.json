@@ -29,8 +29,7 @@
     "@xmtp/content-type-remote-attachment": "latest",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
-    "openai": "^4.0.0",
-    "pinata": "^2.5.1"
+    "openai": "^4.0.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",

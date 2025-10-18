@@ -333,65 +333,43 @@ async function main(): Promise<void> {
         `💰 Split calculated: ${receiptData.currency} ${perPerson} per person (${numberOfPeople} people)`,
       );
 
-      // Upload image to IPFS
+      // Extract IPFS hash from the remote attachment URL
+      // XMTP already uploaded the file to IPFS, we just need to get the hash
       let ipfsHash = '';
       try {
-        console.log('📤 Uploading receipt image to IPFS...');
-        const { uploadReceiptToIPFS } = await import('./utils/ipfs.js');
-        ipfsHash = await uploadReceiptToIPFS(attachment.data, attachment.mimeType);
-        console.log(`✅ Receipt uploaded to IPFS: ${ipfsHash}`);
+        console.log('📍 Extracting IPFS hash from attachment URL...');
+        const attachmentUrl = remoteAttachment.url;
+        console.log(`   Attachment URL: ${attachmentUrl}`);
+
+        // Extract IPFS hash from URL (format: https://*/ipfs/Qm... or ipfs://Qm...)
+        const ipfsMatch = attachmentUrl.match(/(?:ipfs\/|ipfs:\/\/)([A-Za-z0-9]+)/);
+        if (ipfsMatch !== null && ipfsMatch[1] !== undefined) {
+          ipfsHash = ipfsMatch[1];
+          console.log(`✅ Extracted IPFS hash: ${ipfsHash}`);
+        } else {
+          console.warn('⚠️  Could not extract IPFS hash from URL, using full URL');
+          ipfsHash = attachmentUrl; // Fallback to using the full URL
+        }
       } catch (error) {
-        console.error('❌ Failed to upload to IPFS:', error);
-        // Continue without IPFS - we'll use a placeholder
-        ipfsHash = 'upload-failed';
+        console.error('❌ Failed to extract IPFS hash:', error);
+        ipfsHash = 'unknown';
       }
 
-      // Save expense on-chain
-      let txHash = '';
-      try {
-        console.log('⛓️  Saving expense to blockchain...');
+      // TODO: Save expense on-chain
+      // This requires implementing a mechanism for the payer to sign the transaction
+      // Options:
+      // 1. Generate transaction request and send to user via XMTP
+      // 2. Use ERC-2771 meta-transaction with bot as relayer
+      // 3. Direct user to mini-app to approve transaction
+      const txHash = '';
+      console.log('⚠️  On-chain integration not yet implemented');
+      console.log('   Receipt data and IPFS hash available for future on-chain storage');
 
-        // Import blockchain utilities
-        const { ensureGroupExists, addExpenseOnchain, getBaseScanUrl } = await import('./utils/blockchain.js');
-
-        // Get group members' addresses
-        // Note: GroupMember type might have different structure, we'll need to check this
-        // For now, we'll skip this part as it's commented out anyway
-        const memberAddresses: string[] = [];
-
-        console.log(`   Group members: ${memberAddresses.length}`);
-
-        // Ensure group exists (will create if needed)
-        // Note: For now, we'll skip this as it requires a creator private key
-        // In production, you'd handle this differently (maybe have bot create groups)
-        // await ensureGroupExists(ctx.conversation.id, memberAddresses, CREATOR_PRIVATE_KEY);
-
-        // Add expense to blockchain
-        // Note: This requires the payer's private key to sign the transaction
-        // For demo purposes, we'll use a bot wallet or skip this
-        // In production, you'd have users sign this transaction themselves
-
-        // For now, we'll comment this out since we need the payer's private key
-        // txHash = await addExpenseOnchain(
-        //   ctx.conversation.id,
-        //   receiptData,
-        //   perPerson,
-        //   sender,
-        //   ipfsHash,
-        //   PAYER_PRIVATE_KEY
-        // );
-
-        console.log('⚠️  On-chain integration skipped (requires payer signature)');
-        console.log('   In production, user would sign this transaction');
-
-      } catch (error) {
-        console.error('❌ Failed to save on-chain:', error);
-        // Continue anyway - we can still show the split
-      }
-
-      // Send message with IPFS link
-      const ipfsUrl = ipfsHash !== '' && ipfsHash !== 'upload-failed'
-        ? `https://gateway.pinata.cloud/ipfs/${ipfsHash}`
+      // Build IPFS URL for the receipt
+      // Use a public gateway (can be configured via env var)
+      const ipfsGateway = process.env.PINATA_GATEWAY ?? 'https://gateway.pinata.cloud';
+      const ipfsUrl = ipfsHash !== '' && ipfsHash !== 'unknown'
+        ? `${ipfsGateway}/ipfs/${ipfsHash}`
         : '';
 
       const message = `📝 **Nuova spesa aggiunta da ${sender.substring(0, 6)}...${sender.substring(sender.length - 4)}**
