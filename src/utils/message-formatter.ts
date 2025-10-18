@@ -37,7 +37,7 @@ export function createFallbackMessage(
  * Creates a help message explaining how to use the agent
  */
 export function createHelpMessage(): string {
-  return `👋 **e io pago** - AI Receipt Splitter
+  return `👋 **E io pago!** - AI Receipt Splitter
 
 I automatically analyze receipts, split expenses equally among group members, and track everything on-chain (Base Sepolia).
 
