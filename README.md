@@ -1,4 +1,4 @@
-# e io pago
+# E io pago!
 
 An intelligent XMTP agent on Base Network that analyzes receipt images using GPT-4o Vision and automatically calculates bill splits for groups.
 

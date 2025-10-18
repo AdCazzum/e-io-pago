@@ -1,4 +1,4 @@
-# e io pago - Mini-App
+# E io pago! - Mini-App
 
 Next.js web application for viewing group expenses and managing debts on Base Sepolia.
 
