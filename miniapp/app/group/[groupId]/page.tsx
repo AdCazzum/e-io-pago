@@ -166,6 +166,7 @@ export default function GroupPage() {
           </div>
         </div>
 
+
         {/* Debts Section */}
         {debtsData && debtsData.debts.length > 0 && (
           <div className="mb-5">
@@ -173,7 +174,7 @@ export default function GroupPage() {
             <div className="space-y-3">
               {debtsData.debts.map((debt, index) => (
                 <div key={index} className="bg-white rounded-2xl shadow p-4">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-gray-500 mb-2">You owe</p>
                       <AddressDisplay address={debt.creditor} />
@@ -184,9 +185,9 @@ export default function GroupPage() {
                       </p>
                     </div>
                   </div>
-                  <button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg transition-all duration-200 active:scale-95">
-                    Mark as Paid
-                  </button>
+                  <div className="mt-3 text-sm text-gray-600 text-center">
+                    To mark as paid, use the <span className="font-mono bg-gray-100 px-2 py-1 rounded">@eiopago paid</span> command in your XMTP chat
+                  </div>
                 </div>
               ))}
             </div>

@@ -401,10 +401,18 @@ export async function findExpensesByCreditor(
   creditorAddress: string,
 ): Promise<bigint[]> {
   try {
+    // First, get the total debt to avoid exceeding it
+    const totalDebt = await getDebtAmount(groupId, debtorAddress, creditorAddress);
+
+    if (totalDebt === 0n) {
+      return [];
+    }
+
     // Get all expenses for the group
     const expenseIds = await getGroupExpenses(groupId);
 
     const matchingExpenses: bigint[] = [];
+    let accumulatedAmount = 0n;
 
     for (const expenseId of expenseIds) {
       const expense = await getExpense(expenseId);
@@ -423,7 +431,11 @@ export async function findExpensesByCreditor(
       );
 
       if (isParticipant) {
-        matchingExpenses.push(expenseId);
+        // Only add expense if it doesn't exceed total debt
+        if (accumulatedAmount + expense.perPersonAmount <= totalDebt) {
+          matchingExpenses.push(expenseId);
+          accumulatedAmount += expense.perPersonAmount;
+        }
       }
     }
 

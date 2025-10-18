@@ -1,8 +1,10 @@
-import { ethers } from 'ethers';
+import { createPublicClient, http, type Address, formatEther as viemFormatEther } from 'viem';
+import { baseSepolia } from 'viem/chains';
 
 import ExpenseManagerABI from '../../contracts/ExpenseManager.json';
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_EXPENSE_CONTRACT_ADDRESS ?? '';
+// IMPORTANT: Using the NEW contract address (deployed with correct batchMarkAsPaid function)
+const CONTRACT_ADDRESS = '0x2BdC8CC1bcc1C4d9394db0679a6075839F518742' as Address;
 
 // Support both local and testnet RPC
 const useLocalNetwork = process.env.NEXT_PUBLIC_USE_LOCAL_NETWORK === 'true';
@@ -10,13 +12,14 @@ const RPC_URL = useLocalNetwork
   ? process.env.NEXT_PUBLIC_LOCAL_RPC_URL ?? 'http://127.0.0.1:8545'
   : process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC ?? 'https://sepolia.base.org';
 
-export function getContract(): ethers.Contract {
-  const provider = new ethers.JsonRpcProvider(RPC_URL);
-  return new ethers.Contract(CONTRACT_ADDRESS, ExpenseManagerABI.abi, provider);
-}
+const chain = baseSepolia;
 
-export function getContractWithSigner(signer: ethers.Signer): ethers.Contract {
-  return new ethers.Contract(CONTRACT_ADDRESS, ExpenseManagerABI.abi, signer);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getPublicClient(): any {
+  return createPublicClient({
+    chain,
+    transport: http(RPC_URL),
+  });
 }
 
 export interface DebtInfo {
@@ -53,24 +56,35 @@ export async function getUserDebtsAndCredits(
   totalCredits: bigint
   netBalance: bigint
 }> {
-  const contract = getContract();
+  const client = getPublicClient();
 
   try {
-    const [debtCreditors, debtAmounts] = await contract.getUserDebts(groupId, userAddress);
-    const [creditDebtors, creditAmounts] = await contract.getUserCredits(groupId, userAddress);
+    const [debtCreditors, debtAmounts] = await client.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ExpenseManagerABI.abi,
+      functionName: 'getUserDebts',
+      args: [groupId, userAddress],
+    }) as [readonly Address[], readonly bigint[]];
+
+    const [creditDebtors, creditAmounts] = await client.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ExpenseManagerABI.abi,
+      functionName: 'getUserCredits',
+      args: [groupId, userAddress],
+    }) as [readonly Address[], readonly bigint[]];
 
     // Filter out bot address from debts/credits
     const botAddress = process.env.NEXT_PUBLIC_BOT_ADDRESS?.toLowerCase();
 
     const debts: DebtInfo[] = debtCreditors
-      .map((creditor: string, i: number) => ({
+      .map((creditor: Address, i: number) => ({
         creditor,
         amount: debtAmounts[i],
       }))
       .filter((debt: DebtInfo) => botAddress === undefined || debt.creditor.toLowerCase() !== botAddress);
 
     const credits: CreditInfo[] = creditDebtors
-      .map((debtor: string, i: number) => ({
+      .map((debtor: Address, i: number) => ({
         debtor,
         amount: creditAmounts[i],
       }))
@@ -94,14 +108,25 @@ export async function getUserDebtsAndCredits(
 }
 
 export async function getGroupExpenses(groupId: string): Promise<ExpenseData[]> {
-  const contract = getContract();
+  const client = getPublicClient();
 
   try {
-    const expenseIds = await contract.getGroupExpenses(groupId);
+    const expenseIds = await client.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ExpenseManagerABI.abi,
+      functionName: 'getGroupExpenses',
+      args: [groupId],
+    }) as readonly bigint[];
+
     const expenses: ExpenseData[] = [];
 
     for (const id of expenseIds) {
-      const expense = await contract.getExpense(id);
+      const expense = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ExpenseManagerABI.abi,
+        functionName: 'getExpense',
+        args: [id],
+      }) as ExpenseData;
       expenses.push(expense);
     }
 
@@ -113,7 +138,7 @@ export async function getGroupExpenses(groupId: string): Promise<ExpenseData[]> 
 }
 
 export function formatEther(value: bigint): string {
-  return ethers.formatEther(value);
+  return viemFormatEther(value);
 }
 
 export function formatAddress(addr: string): string {
