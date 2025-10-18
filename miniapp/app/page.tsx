@@ -14,7 +14,7 @@ export default function Home() {
         <header className="mb-12">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900">💰 E-io-Pago</h1>
+              <h1 className="text-4xl font-bold text-gray-900">💰 e io pago</h1>
               <p className="text-gray-600 mt-2">Group expense tracking on Base</p>
             </div>
             <ConnectWallet />

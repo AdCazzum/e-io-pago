@@ -45,9 +45,6 @@ XMTP_ENV=dev
 # OpenAI Configuration
 # Get your API key from: https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
-
-# Optional: Database path (defaults to ./data/xmtp-db)
-# DB_PATH=./data/xmtp-db
 `;
 
   // Write to .env file

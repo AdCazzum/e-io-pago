@@ -14,7 +14,8 @@ dist/
 *.tsbuildinfo
 
 # XMTP database
-data/
+data/*
+!data/.gitkeep
 *.db
 *.db3
 *.db3-shm

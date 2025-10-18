@@ -1,6 +1,6 @@
 # Complete Local Testing Guide
 
-This guide explains exactly how to test the entire E-io-Pago system locally.
+This guide explains exactly how to test the entire e io pago system locally.
 
 ## Minimum Setup Required
 

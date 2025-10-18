@@ -1,7 +1,7 @@
 {
-  "name": "xmtp-receipt-split-agent",
+  "name": "e-io-pago",
   "version": "1.0.0",
-  "description": "XMTP agent on Base Network that analyzes receipt images and splits bills equally among group members",
+  "description": "e io pago - XMTP agent on Base Network that analyzes receipt images and splits bills equally among group members",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

@@ -6,7 +6,7 @@ export const config = createConfig({
   chains: [baseSepolia],
   connectors: [
     coinbaseWallet({
-      appName: process.env.NEXT_PUBLIC_APP_NAME || 'E-io-Pago',
+      appName: process.env.NEXT_PUBLIC_APP_NAME || 'e io pago',
       preference: 'smartWalletOnly', // Use only Smart Wallet (gasless support)
     }),
   ],
